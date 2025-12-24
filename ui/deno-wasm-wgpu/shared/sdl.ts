@@ -1,0 +1,2 @@
+export const SDL_WINDOWEVENT_RESIZED = 0x05;
+export const SDL_WINDOWEVENT_SIZE_CHANGED = 0x06;

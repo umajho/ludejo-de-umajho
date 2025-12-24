@@ -1,0 +1,22 @@
+{
+  "deno.enablePaths": [
+    "./ui/deno-wasm-wgpu"
+  ],
+
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "[javascript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[javascriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "oxc.oxc-vscode"
+  },
+  "[wgsl]": {
+    "editor.defaultFormatter": "wgsl-analyzer.wgsl-analyzer"
+  }
+}
