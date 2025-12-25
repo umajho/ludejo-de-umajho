@@ -5,7 +5,6 @@ use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-#[cfg(target_arch = "wasm32")]
 use winit::event_loop::EventLoop;
 use winit::{
     application::ApplicationHandler,
@@ -14,6 +13,36 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::Window,
 };
+
+pub fn run() -> anyhow::Result<()> {
+    cfg_select! {
+        target_arch = "wasm32" => {
+            console_log::init_with_level(log::Level::Debug).unwrap_throw();
+        }
+        _ => {
+            env_logger::init();
+        }
+    }
+
+    let event_loop = EventLoop::with_user_event().build()?;
+    let mut app = cfg_select! {
+        target_arch = "wasm32" => { App::new(&event_loop) }
+        _ => { App::new() }
+    };
+    event_loop.run_app(&mut app)?;
+
+    Ok(())
+}
+
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
+pub fn run_web() -> Result<(), wasm_bindgen::JsValue> {
+    console_error_panic_hook::set_once();
+    log::info!("111");
+    run().unwrap_throw();
+
+    Ok(())
+}
 
 pub struct State {
     surface: wgpu::Surface<'static>,
