@@ -4,7 +4,7 @@ import { match, P } from "npm:ts-pattern";
 
 import TK from "npm:terminal-kit";
 
-import { EventType, WindowBuilder, Window } from "jsr:@divy/sdl2@0.15";
+import { WindowBuilder, Window } from "jsr:@divy/sdl2@0.15";
 
 import { setProcessTitle } from "./shared/init.ts";
 
@@ -38,13 +38,14 @@ class App {
   async start() {
     {
       this.#window = new WindowBuilder("Hello, Deno!", 1, 1)
-        // .hidden()
+        // .skipTaskbar() // no effect, at least on macOS.
+        .hidden() // seems unnecessary?
         .build();
 
       const adapter = (await navigator.gpu.requestAdapter())!;
       this.#device = await adapter.requestDevice();
 
-      this.#surface = this.#window.windowSurface(400, 400);
+      this.#surface = this.#window.windowSurface(1, 1);
       this.#context = this.#surface.getContext("webgpu");
 
       this.#context.configure({
@@ -114,44 +115,31 @@ class App {
   async _render() {
     if (!this.#terminalSize) return;
 
-    let imageData!: Canvas2d.ImageData;
-    let windowSize!: { width: number; height: number };
-
-    for await (const event of this.#window.events()) {
-      if (event.type === EventType.Quit) {
-        TK.terminal.processExit(0);
-      } else if (event.type === EventType.Draw) {
-        windowSize = Sdl2.raw.SDL_GetWindowSize(this.#window);
-        if (
-          windowSize.width !== this.#textHelperCanvas.width ||
-          windowSize.height !== this.#textHelperCanvas.height
-        ) {
-          this.#textHelperCanvas.width = windowSize.width;
-          this.#textHelperCanvas.height = windowSize.height;
-        }
-
-        Canvas2d.clearAndDrawCurrentTime(this.#textHelperCanvas, "10rem monospace", {
-          redSpot: this.#redSpot
-            ? {
-                x: (this.#redSpot.x + 0.5) * SCALE * CHARACTER_ASPECT_RATIO,
-                y: (this.#redSpot.y + 0.5) * SCALE,
-              }
-            : null,
-        });
-
-        this.#renderer.render(this.#context, this.#textHelperCanvas);
-
-        imageData = await CanvasGpu.textureToImageData(this.#renderer.texture!, {
-          device: this.#device,
-          width: windowSize.width,
-          height: windowSize.height,
-        });
-
-        this.#surface.present();
-
-        break;
-      }
+    const windowSize = Sdl2.raw.SDL_GetWindowSize(this.#window);
+    if (
+      windowSize.width !== this.#textHelperCanvas.width ||
+      windowSize.height !== this.#textHelperCanvas.height
+    ) {
+      this.#textHelperCanvas.width = windowSize.width;
+      this.#textHelperCanvas.height = windowSize.height;
     }
+
+    Canvas2d.clearAndDrawCurrentTime(this.#textHelperCanvas, "10rem monospace", {
+      redSpot: this.#redSpot
+        ? {
+            x: (this.#redSpot.x + 0.5) * SCALE * CHARACTER_ASPECT_RATIO,
+            y: (this.#redSpot.y + 0.5) * SCALE,
+          }
+        : null,
+    });
+
+    this.#renderer.render(this.#context, this.#textHelperCanvas);
+
+    const imageData = await CanvasGpu.textureToImageData(this.#renderer.texture!, {
+      device: this.#device,
+      width: windowSize.width,
+      height: windowSize.height,
+    });
 
     WinImplTerm.redraw(
       this.#terminalResizer.resizeFromImageData(
