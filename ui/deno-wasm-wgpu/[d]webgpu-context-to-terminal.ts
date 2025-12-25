@@ -45,7 +45,7 @@ class App {
       const adapter = (await navigator.gpu.requestAdapter())!;
       this.#device = await adapter.requestDevice();
 
-      this.#surface = this.#window.windowSurface(1, 1);
+      this.#surface = this.#window.windowSurface(400, 400);
       this.#context = this.#surface.getContext("webgpu");
 
       this.#context.configure({
