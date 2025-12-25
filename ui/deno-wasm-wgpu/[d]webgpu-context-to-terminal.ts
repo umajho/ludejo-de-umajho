@@ -54,7 +54,9 @@ class App {
         alphaMode: "opaque",
       });
 
-      this.#renderer = new CanvasGpu.Canvas2dRenderer(this.#device);
+      this.#renderer = new CanvasGpu.Canvas2dRenderer(this.#device, {
+        isOffscreen: true,
+      });
 
       this.#textHelperCanvas = Canvas2d.createCanvas(1, 1);
     }

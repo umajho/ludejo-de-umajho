@@ -12,6 +12,8 @@ const shader = await Deno.readTextFile(
 export class Canvas2dRenderer {
   #device: GPUDevice;
 
+  #isOffscreen: boolean;
+
   #pipeline: GPURenderPipeline;
   #sampler: GPUSampler;
 
@@ -20,8 +22,10 @@ export class Canvas2dRenderer {
     bindGroup: GPUBindGroup;
   } | null = null;
 
-  constructor(device: GPUDevice) {
+  constructor(device: GPUDevice, opts?: { isOffscreen?: boolean }) {
     this.#device = device;
+
+    this.#isOffscreen = opts?.isOffscreen ?? false;
 
     const format = navigator.gpu.getPreferredCanvasFormat();
 
@@ -66,10 +70,11 @@ export class Canvas2dRenderer {
       size: [opts.width, opts.height],
       format: "rgba8unorm",
       usage:
-        GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT |
-        GPUTextureUsage.COPY_SRC,
+        GPUTextureUsage.COPY_SRC |
+        (this.#isOffscreen
+          ? 0
+          : GPUTextureUsage.TEXTURE_BINDING) /* don't know why it is not `RENDER_ATTACHMENT` but this. */,
     });
 
     const bindGroup = this.#device.createBindGroup({
