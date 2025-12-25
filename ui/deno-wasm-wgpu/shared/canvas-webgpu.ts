@@ -68,7 +68,8 @@ export class Canvas2dRenderer {
       usage:
         GPUTextureUsage.TEXTURE_BINDING |
         GPUTextureUsage.COPY_DST |
-        GPUTextureUsage.RENDER_ATTACHMENT,
+        GPUTextureUsage.RENDER_ATTACHMENT |
+        GPUTextureUsage.COPY_SRC,
     });
 
     const bindGroup = this.#device.createBindGroup({
@@ -82,6 +83,10 @@ export class Canvas2dRenderer {
     return (this.#dynamic = { texture, bindGroup });
   }
 
+  get texture() {
+    return this.#dynamic?.texture ?? null;
+  }
+
   render(context: GPUCanvasContext, canvas2d: Canvas2d.Canvas) {
     const width = canvas2d.width;
     const height = canvas2d.height;
@@ -89,7 +94,7 @@ export class Canvas2dRenderer {
     const { texture, bindGroup } = this.#updateDynamic({ width, height });
 
     this.#device.queue.writeTexture(
-      { texture: texture },
+      { texture },
       canvas2d.getContext("2d").getImageData(0, 0, width, height).data,
       { bytesPerRow: width * 4 },
       { width, height },
@@ -113,4 +118,43 @@ export class Canvas2dRenderer {
 
     this.#device.queue.submit([encoder.finish()]);
   }
+}
+
+export async function textureToImageData(
+  texture: GPUTexture,
+  opts: { device: GPUDevice; width: number; height: number },
+): Promise<Canvas2d.ImageData> {
+  const bytesPerPixel = 4;
+  const unalignedBytesPerRow = opts.width * bytesPerPixel;
+  const bytesPerRow = Math.ceil(unalignedBytesPerRow / 256) * 256;
+  const bufferSize = bytesPerRow * opts.height;
+
+  const buffer = opts.device.createBuffer({
+    size: bufferSize,
+    usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+  });
+
+  const commandEncoder = opts.device.createCommandEncoder();
+  commandEncoder.copyTextureToBuffer(
+    { texture },
+    { buffer, bytesPerRow },
+    { width: opts.width, height: opts.height },
+  );
+  opts.device.queue.submit([commandEncoder.finish()]);
+
+  await buffer.mapAsync(GPUMapMode.READ);
+
+  const mapped = buffer.getMappedRange();
+  const data = new Uint8Array(mapped);
+  const pixels = new Uint8ClampedArray(opts.width * opts.height * bytesPerPixel);
+
+  for (let y = 0; y < opts.height; y++) {
+    const srcOffset = y * bytesPerRow;
+    const dstOffset = y * unalignedBytesPerRow;
+    pixels.set(data.subarray(srcOffset, srcOffset + unalignedBytesPerRow), dstOffset);
+  }
+
+  buffer.unmap();
+
+  return new Canvas2d.ImageData(pixels, opts.width, opts.height);
 }

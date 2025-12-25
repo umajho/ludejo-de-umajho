@@ -1,8 +1,14 @@
+import "@std/dotenv/load";
+
 import { EventType, WindowBuilder } from "jsr:@divy/sdl2@0.15";
 
+import { setProcessTitle } from "./shared/init.ts";
+
 import * as Canvas2d from "./shared/canvas-2d.ts";
+import * as CanvasGpu from "./shared/canvas-webgpu.ts";
 import { SDL_WINDOWEVENT_RESIZED, SDL_WINDOWEVENT_SIZE_CHANGED } from "./shared/sdl.ts";
-import { Canvas2dRenderer } from "./shared/canvas-webgpu.ts";
+
+setProcessTitle("deno-wasm-wgpu-b");
 
 async function main() {
   const canvas2d = Canvas2d.createCanvas(640, 480);
@@ -23,7 +29,7 @@ async function main() {
     alphaMode: "opaque",
   });
 
-  const renderer = new Canvas2dRenderer(device);
+  const renderer = new CanvasGpu.Canvas2dRenderer(device);
 
   for await (const event of window.events()) {
     if (event.type === EventType.Quit) {

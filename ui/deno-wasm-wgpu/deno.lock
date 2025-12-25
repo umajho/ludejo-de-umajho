@@ -10,6 +10,7 @@
     "jsr:@std/assert@0.214": "0.214.0",
     "jsr:@std/assert@0.217": "0.217.0",
     "jsr:@std/assert@1": "1.0.16",
+    "jsr:@std/dotenv@~0.225.6": "0.225.6",
     "jsr:@std/encoding@0.214": "0.214.0",
     "jsr:@std/encoding@0.217.0": "0.217.0",
     "jsr:@std/encoding@~0.224.2": "0.224.3",
@@ -87,6 +88,9 @@
       "dependencies": [
         "jsr:@std/internal"
       ]
+    },
+    "@std/dotenv@0.225.6": {
+      "integrity": "1d6f9db72f565bd26790fa034c26e45ecb260b5245417be76c2279e5734c421b"
     },
     "@std/encoding@0.214.0": {
       "integrity": "30a8713e1db22986c7e780555ffd2fefd1d4f9374d734bb41f5970f6c3352af5"
@@ -554,6 +558,7 @@
       "jsr:@gfx/canvas@~0.5.8",
       "jsr:@josefabio/deno-canvas@^1.5.2",
       "jsr:@std/assert@1",
+      "jsr:@std/dotenv@~0.225.6",
       "npm:@napi-rs/canvas@~0.1.86",
       "npm:@types/node@^25.0.3",
       "npm:@types/terminal-kit@^2.5.7",

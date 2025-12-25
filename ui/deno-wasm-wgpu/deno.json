@@ -1,8 +1,10 @@
 {
   "nodeModulesDir": "auto",
   "tasks": {
-    "a": "deno run --allow-env --allow-ffi --allow-sys=homedir --watch '[a]image-to-terminal.ts'",
-    "b": "DENO_SDL2_PATH=/opt/homebrew/lib/ deno run --allow-read='.' --allow-env --allow-ffi --allow-sys=homedir --unstable-webgpu --watch '[b]webgpu-windowing-sdl2.ts'"
+    "a": "deno run --allow-env --allow-ffi --allow-sys=homedir '[a]image-to-terminal.ts'",
+    "b": "deno run --allow-read='.' --allow-env --allow-ffi --allow-sys=homedir --unstable-webgpu '[b]webgpu-windowing-sdl2.ts'",
+    "c": "deno run --allow-read='.' --allow-env --allow-ffi --allow-sys=homedir --unstable-webgpu '[c]draw-on-both-sdl2-and-terminal.ts'",
+    "d": "deno run --allow-read='.' --allow-env --allow-ffi --allow-sys=homedir --unstable-webgpu '[d]webgpu-context-to-terminal.ts'"
   },
   "imports": {
     "@divy/sdl2": "jsr:@divy/sdl2@^0.15.0",
@@ -10,6 +12,7 @@
     "@josefabio/deno-canvas": "jsr:@josefabio/deno-canvas@^1.5.2",
     "@napi-rs/canvas": "npm:@napi-rs/canvas@^0.1.86",
     "@std/assert": "jsr:@std/assert@1",
+    "@std/dotenv": "jsr:@std/dotenv@^0.225.6",
     "@types/node": "npm:@types/node@^25.0.3",
     "@types/terminal-kit": "npm:@types/terminal-kit@^2.5.7",
     "ansi-escapes": "npm:ansi-escapes@^7.2.0",
