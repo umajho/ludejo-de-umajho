@@ -9,6 +9,7 @@ bytemuck = { version = "1.24.0", features = ["derive"] }
 env_logger = "0.11.8"
 log = "0.4.29"
 pollster = "0.4.0"
+trig-const = "0.3.0"
 wgpu = "27.0.1"
 winit = { version = "0.30.12", features = ["android-native-activity"] }
 

@@ -1,11 +1,13 @@
 #![feature(cfg_select)]
+#![feature(decl_macro)]
+
+mod shapes;
 
 use std::sync::Arc;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use wgpu::util::DeviceExt;
 use winit::event_loop::EventLoop;
 use winit::{
     application::ApplicationHandler,
@@ -14,6 +16,8 @@ use winit::{
     keyboard::{KeyCode, PhysicalKey},
     window::Window,
 };
+
+use crate::shapes::{Shapes, Vertex};
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
@@ -52,10 +56,10 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
     render_pipelines: RenderPipelines,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    num_indices: u32,
+    shapes: Shapes,
     window: Arc<Window>,
+
+    is_challenge: bool,
 }
 
 impl State {
@@ -108,17 +112,7 @@ impl State {
 
         let render_pipelines = RenderPipelines::new(&device, &config);
 
-        let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Vertex Buffer"),
-            contents: bytemuck::cast_slice(VERTICES),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
-        let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Index Buffer"),
-            contents: bytemuck::cast_slice(INDICES),
-            usage: wgpu::BufferUsages::INDEX,
-        });
-        let num_indices = INDICES.len() as u32;
+        let shapes = Shapes::new(&device);
 
         Ok(Self {
             surface,
@@ -127,10 +121,10 @@ impl State {
             config,
             is_surface_configured: false,
             render_pipelines,
-            vertex_buffer,
-            index_buffer,
-            num_indices,
+            shapes,
             window,
+
+            is_challenge: false,
         })
     }
 
@@ -186,10 +180,13 @@ impl State {
                 timestamp_writes: None,
             });
 
-            render_pass.set_pipeline(self.render_pipelines.current());
-            render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
-            render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-            render_pass.draw_indexed(0..self.num_indices, 0, 0..1);
+            render_pass.set_pipeline(self.render_pipelines.get(self.is_challenge));
+
+            let shape = self.shapes.get(self.is_challenge);
+            render_pass.set_vertex_buffer(0, shape.vertex_buffer().slice(..));
+            render_pass.set_index_buffer(shape.index_buffer().slice(..), wgpu::IndexFormat::Uint16);
+
+            render_pass.draw_indexed(0..shape.num_indices(), 0, 0..1);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -201,7 +198,7 @@ impl State {
     pub fn handle_key(&mut self, event_loop: &ActiveEventLoop, code: KeyCode, is_prossed: bool) {
         match (code, is_prossed) {
             (KeyCode::Escape, true) => event_loop.exit(),
-            (KeyCode::Space, true) => self.render_pipelines.toggle(),
+            (KeyCode::Space, true) => self.is_challenge = !self.is_challenge,
             _ => {}
         }
     }
@@ -209,9 +206,7 @@ impl State {
 
 pub struct RenderPipelines {
     normal: wgpu::RenderPipeline,
-    challenge: wgpu::RenderPipeline,
-
-    is_normal: bool,
+    // challenge: wgpu::RenderPipeline,
 }
 
 impl RenderPipelines {
@@ -222,12 +217,12 @@ impl RenderPipelines {
                 config,
                 device.create_shader_module(wgpu::include_wgsl!("shader.wgsl")),
             ),
-            challenge: Self::new_pipeline(
-                device,
-                config,
-                device.create_shader_module(wgpu::include_wgsl!("shader-challenge.wgsl")),
-            ),
-            is_normal: true,
+            // challenge: Self::new_pipeline(
+            //     device,
+            //     config,
+            //     device
+            //         .create_shader_module(wgpu::include_wgsl!("shader-challenge-beginner-3.wgsl")),
+            // ),
         }
     }
 
@@ -282,68 +277,15 @@ impl RenderPipelines {
         })
     }
 
-    pub fn current(&self) -> &wgpu::RenderPipeline {
-        if self.is_normal {
+    pub fn get(&self, is_challenge: bool) -> &wgpu::RenderPipeline {
+        if is_challenge {
+            // &self.challenge
             &self.normal
         } else {
-            &self.challenge
-        }
-    }
-
-    pub fn toggle(&mut self) {
-        self.is_normal = !self.is_normal;
-    }
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct Vertex {
-    position: [f32; 3],
-    color: [f32; 3],
-}
-
-impl Vertex {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
-        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3];
-
-    fn desc() -> wgpu::VertexBufferLayout<'static> {
-        wgpu::VertexBufferLayout {
-            array_stride: std::mem::size_of::<Self>() as wgpu::BufferAddress,
-            step_mode: wgpu::VertexStepMode::Vertex,
-            attributes: &Self::ATTRIBUTES,
+            &self.normal
         }
     }
 }
-
-const VERTICES: &[Vertex] = &[
-    // 0: A
-    Vertex {
-        position: [-0.0868241, 0.49240386, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    // 1: B
-    Vertex {
-        position: [-0.49513406, 0.06958647, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    // 2: C
-    Vertex {
-        position: [-0.21918549, -0.44939706, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    // 3: D
-    Vertex {
-        position: [0.35966998, -0.3473291, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-    // 4: E
-    Vertex {
-        position: [0.44147372, 0.2347359, 0.0],
-        color: [0.5, 0.0, 0.5],
-    },
-];
-
-const INDICES: &[u16] = &[/**/ 0, 1, 4, /**/ 1, 2, 4, /**/ 2, 3, 4];
 
 pub struct App {
     #[cfg(target_arch = "wasm32")]
