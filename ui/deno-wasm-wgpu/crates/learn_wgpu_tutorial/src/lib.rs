@@ -69,6 +69,10 @@ impl Camera {
 
         OPENGL_TO_WGPU_MATRIX * proj * view
     }
+
+    fn update_aspect(&mut self, width: u32, height: u32) {
+        self.aspect = width as f32 / height as f32;
+    }
 }
 
 #[rustfmt::skip]
@@ -122,7 +126,7 @@ impl State {
                 label: None,
                 required_features: wgpu::Features::empty(),
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
-                required_limits: wgpu::Limits::default(),
+                required_limits: wgpu::Limits::defaults(),
                 memory_hints: Default::default(),
                 trace: wgpu::Trace::Off,
             })
@@ -265,6 +269,8 @@ impl State {
             self.config.height = height;
             self.surface.configure(&self.device, &self.config);
             self.is_surface_configured = true;
+
+            self.camera.update_aspect(width, height);
         }
     }
 
