@@ -4,11 +4,14 @@
 mod copied;
 mod shapes;
 mod textures;
+mod utils;
 
 use std::sync::Arc;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+
+use cgmath::SquareMatrix;
 
 use wgpu::util::DeviceExt;
 use winit::event_loop::EventLoop;
@@ -97,6 +100,9 @@ pub struct State {
     camera_buffer: wgpu::Buffer,
     camera_control: copied::CameraController,
     camera_bind_group: wgpu::BindGroup,
+    model_operation: ModelOperation,
+    model_operation_buffer: wgpu::Buffer,
+    model_operation_bind_group: wgpu::BindGroup,
     window: Arc<Window>,
 
     is_challenge: bool,
@@ -235,10 +241,47 @@ impl State {
 
         let camera_control = copied::CameraController::new(0.2);
 
+        let model_operation = ModelOperation {
+            rotation_matrix: cgmath::Matrix4::identity().into(),
+        };
+
+        let model_operation_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Model Operation Buffer"),
+            contents: bytemuck::cast_slice(&[model_operation]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let model_operation_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: Some("model_operation_bind_group_layout"),
+            });
+        let model_operation_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &model_operation_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: model_operation_buffer.as_entire_binding(),
+            }],
+            label: Some("model_operation_bind_group"),
+        });
+
         let render_pipelines = RenderPipelines::new(
             &device,
             &config,
-            &[&texture_bind_group_layout, &camera_bind_group_layout],
+            &[
+                &texture_bind_group_layout,
+                &camera_bind_group_layout,
+                &model_operation_bind_group_layout,
+            ],
         );
 
         let shapes = Shapes::new(&device);
@@ -257,6 +300,9 @@ impl State {
             camera_buffer,
             camera_bind_group,
             camera_control,
+            model_operation,
+            model_operation_buffer,
+            model_operation_bind_group,
             window,
 
             is_challenge: false,
@@ -281,6 +327,15 @@ impl State {
             &self.camera_buffer,
             0,
             bytemuck::cast_slice(&[self.camera_uniform]),
+        );
+
+        let theta = (utils::now_ms() % 1000) as f32 / 1000.0 * std::f32::consts::TAU;
+        self.model_operation.rotation_matrix =
+            cgmath::Matrix4::from_angle_y(cgmath::Rad(theta)).into();
+        self.queue.write_buffer(
+            &self.model_operation_buffer,
+            0,
+            bytemuck::cast_slice(&[self.model_operation]),
         );
     }
 
@@ -328,6 +383,7 @@ impl State {
             render_pass.set_pipeline(self.render_pipelines.get(self.is_challenge));
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
+            render_pass.set_bind_group(2, &self.model_operation_bind_group, &[]);
 
             let shape = self.shapes.get(self.is_challenge);
             render_pass.set_vertex_buffer(0, shape.vertex_buffer().slice(..));
@@ -438,7 +494,6 @@ struct CameraUniform {
 
 impl CameraUniform {
     fn new() -> Self {
-        use cgmath::SquareMatrix;
         Self {
             view_proj: cgmath::Matrix4::identity().into(),
         }
@@ -447,6 +502,12 @@ impl CameraUniform {
     fn update_view_proj(&mut self, camera: &Camera) {
         self.view_proj = camera.build_view_projection_matrix().into();
     }
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+struct ModelOperation {
+    rotation_matrix: [[f32; 4]; 4],
 }
 
 pub struct App {
