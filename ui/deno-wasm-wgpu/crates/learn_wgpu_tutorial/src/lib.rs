@@ -252,7 +252,6 @@ impl State {
 
 pub struct RenderPipelines {
     normal: wgpu::RenderPipeline,
-    // challenge: wgpu::RenderPipeline,
 }
 
 impl RenderPipelines {
@@ -268,13 +267,6 @@ impl RenderPipelines {
                 device.create_shader_module(wgpu::include_wgsl!("shader.wgsl")),
                 bind_group_layouts,
             ),
-            // challenge: Self::new_pipeline(
-            //     device,
-            //     config,
-            //     device
-            //         .create_shader_module(wgpu::include_wgsl!("shader-challenge-beginner-3.wgsl")),
-            //     bind_group_layouts,
-            // ),
         }
     }
 
@@ -330,13 +322,8 @@ impl RenderPipelines {
         })
     }
 
-    pub fn get(&self, is_challenge: bool) -> &wgpu::RenderPipeline {
-        if is_challenge {
-            // &self.challenge
-            &self.normal
-        } else {
-            &self.normal
-        }
+    pub fn get(&self, _is_challenge: bool) -> &wgpu::RenderPipeline {
+        &self.normal
     }
 }
 
