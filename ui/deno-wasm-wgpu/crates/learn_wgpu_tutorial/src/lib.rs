@@ -11,7 +11,7 @@ use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use cgmath::SquareMatrix;
+use cgmath::prelude::*;
 
 use wgpu::util::DeviceExt;
 use winit::event_loop::EventLoop;
@@ -104,6 +104,8 @@ pub struct State {
     model_operation_buffer: wgpu::Buffer,
     model_operation_bind_group: wgpu::BindGroup,
     window: Arc<Window>,
+    instances: Vec<Instance>,
+    instance_buffer: wgpu::Buffer,
 
     is_challenge: bool,
 }
@@ -286,6 +288,36 @@ impl State {
 
         let shapes = Shapes::new(&device);
 
+        let instances = (0..NUM_INSTANCES_PER_ROW)
+            .flat_map(|z| {
+                (0..NUM_INSTANCES_PER_ROW).map(move |x| {
+                    let position = cgmath::Vector3 {
+                        x: x as f32,
+                        y: 0.0,
+                        z: z as f32,
+                    } - INSTANCE_DISPLACEMENT;
+
+                    let rotation = if position.is_zero() {
+                        cgmath::Quaternion::from_axis_angle(
+                            cgmath::Vector3::unit_z(),
+                            cgmath::Deg(0.0),
+                        )
+                    } else {
+                        cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
+                    };
+
+                    Instance { position, rotation }
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let instance_data = instances.iter().map(InstanceRaw::from).collect::<Vec<_>>();
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
+
         Ok(Self {
             surface,
             device,
@@ -304,6 +336,8 @@ impl State {
             model_operation_buffer,
             model_operation_bind_group,
             window,
+            instances,
+            instance_buffer,
 
             is_challenge: false,
         })
@@ -387,9 +421,10 @@ impl State {
 
             let shape = self.shapes.get(self.is_challenge);
             render_pass.set_vertex_buffer(0, shape.vertex_buffer().slice(..));
+            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
             render_pass.set_index_buffer(shape.index_buffer().slice(..), wgpu::IndexFormat::Uint16);
 
-            render_pass.draw_indexed(0..shape.num_indices(), 0, 0..1);
+            render_pass.draw_indexed(0..shape.num_indices(), 0, 0..self.instances.len() as u32);
         }
 
         self.queue.submit(std::iter::once(encoder.finish()));
@@ -449,7 +484,7 @@ impl RenderPipelines {
                 module: &shader,
                 entry_point: Some("vs_main"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[Vertex::desc()],
+                buffers: &[Vertex::desc(), InstanceRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: &shader,
@@ -509,6 +544,51 @@ impl CameraUniform {
 struct ModelOperation {
     rotation_matrix: [[f32; 4]; 4],
 }
+
+struct Instance {
+    position: cgmath::Vector3<f32>,
+    rotation: cgmath::Quaternion<f32>,
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct InstanceRaw {
+    model: [[f32; 4]; 4],
+}
+
+impl From<&Instance> for InstanceRaw {
+    fn from(value: &Instance) -> Self {
+        Self {
+            model: (cgmath::Matrix4::from_translation(value.position)
+                * cgmath::Matrix4::from(value.rotation))
+            .into(),
+        }
+    }
+}
+
+impl InstanceRaw {
+    const ATTRIBUTES: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+        5 => Float32x4,
+        6 => Float32x4,
+        7 => Float32x4,
+        8 => Float32x4
+    ];
+
+    const fn desc() -> wgpu::VertexBufferLayout<'static> {
+        wgpu::VertexBufferLayout {
+            array_stride: std::mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &Self::ATTRIBUTES,
+        }
+    }
+}
+
+const NUM_INSTANCES_PER_ROW: u32 = 10;
+const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
+    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+    0.0,
+    NUM_INSTANCES_PER_ROW as f32 * 0.5,
+);
 
 pub struct App {
     #[cfg(target_arch = "wasm32")]
