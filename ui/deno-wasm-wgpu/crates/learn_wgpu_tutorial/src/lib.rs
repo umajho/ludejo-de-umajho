@@ -3,6 +3,7 @@
 
 mod copied;
 mod models;
+mod resources;
 mod textures;
 mod utils;
 
@@ -23,7 +24,7 @@ use winit::{
     window::Window,
 };
 
-use crate::models::{Shapes, Vertex};
+use crate::models::{DrawModel, Model, ShapeVertex, Shapes};
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
@@ -94,6 +95,7 @@ pub struct State {
     is_surface_configured: bool,
     render_pipelines: RenderPipelines,
     shapes: Shapes,
+    obj_model: Model,
     diffuse_bind_group: wgpu::BindGroup,
     camera: Camera,
     camera_uniform: CameraUniform,
@@ -255,6 +257,10 @@ impl State {
 
         let shapes = Shapes::new(&device);
 
+        let obj_model_loader = resources::ResLoader::<resources::ResCube>::new("cube");
+        let obj_model =
+            obj_model_loader.load_model("cube.obj", &device, &queue, &texture_bind_group_layout)?;
+
         const NUM_INSTANCES_PER_ROW: u32 = 10;
         let instances = Instances::new(&device, NUM_INSTANCES_PER_ROW as usize);
 
@@ -266,6 +272,7 @@ impl State {
             is_surface_configured: false,
             render_pipelines,
             shapes,
+            obj_model,
             diffuse_bind_group,
             camera,
             camera_uniform,
@@ -359,12 +366,11 @@ impl State {
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
 
-            let shape = self.shapes.get(self.is_challenge);
-            render_pass.set_vertex_buffer(0, shape.vertex_buffer().slice(..));
+            // let shape = self.shapes.get(self.is_challenge);
             render_pass.set_vertex_buffer(1, self.instances.instance_buffer.slice(..));
-            render_pass.set_index_buffer(shape.index_buffer().slice(..), wgpu::IndexFormat::Uint16);
 
-            render_pass.draw_indexed(0..shape.num_indices(), 0, 0..self.instances.len() as u32);
+            render_pass
+                .draw_mesh_instanced(&self.obj_model.meshes[0], 0..self.instances.len() as u32);
         }
 
         // self.depth_pass.render(&view, &mut encoder);
@@ -422,7 +428,7 @@ impl RenderPipelines {
                 module: shader,
                 entry_point: Some("vs_main"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[Vertex::desc(), InstanceRaw::desc()],
+                buffers: &[ShapeVertex::desc(), InstanceRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
@@ -573,10 +579,15 @@ impl Instances {
     const AMPLITUDE: f32 = 0.5;
 
     fn update(&mut self, device: &wgpu::Device, now_ms: u64) {
+        const SPACE_BETWEEN: f32 = 3.0;
+
         let progress = (now_ms % 1000) as f32 / 1000.0;
 
         for i in 0..self.instances_per_row {
             for j in 0..self.instances_per_row {
+                let x = SPACE_BETWEEN * (i as f32 - self.instances_per_row as f32 / 2.0);
+                let z = SPACE_BETWEEN * (j as f32 - self.instances_per_row as f32 / 2.0);
+
                 let local_progress = (i as f32 * self.instances_per_row as f32 + j as f32)
                     / (self.instances_per_row * self.instances_per_row) as f32
                     + progress;
@@ -584,9 +595,9 @@ impl Instances {
                 let instance = &mut self.instances[i * self.instances_per_row + j];
 
                 let position = cgmath::Vector3 {
-                    x: i as f32,
+                    x,
                     y: Self::AMPLITUDE * (local_progress * std::f32::consts::TAU).sin(),
-                    z: j as f32,
+                    z,
                 } - self.instance_displacement;
                 let rotation = cgmath::Quaternion::from_axis_angle(
                     cgmath::Vector3::unit_y(),

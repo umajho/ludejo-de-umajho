@@ -1,13 +1,21 @@
+use std::ops::Range;
+
 use wgpu::util::DeviceExt;
+
+use crate::textures;
+
+pub trait Vertex {
+    fn desc() -> wgpu::VertexBufferLayout<'static>;
+}
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-pub struct Vertex {
+pub struct ShapeVertex {
     pub position: [f32; 3],
     pub tex_coords: [f32; 2],
 }
 
-impl Vertex {
+impl ShapeVertex {
     const ATTRIBUTES: [wgpu::VertexAttribute; 2] =
         wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2];
 
@@ -31,7 +39,7 @@ pub struct Shape {
 impl Shape {
     pub fn new(
         device: &wgpu::Device,
-        vertices: &'static [Vertex],
+        vertices: &'static [ShapeVertex],
         indices: &'static [u16],
     ) -> Self {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -78,30 +86,30 @@ impl Shapes {
         }
     }
 
-    const fn normal() -> (&'static [Vertex], &'static [u16]) {
+    const fn normal() -> (&'static [ShapeVertex], &'static [u16]) {
         let vertices = &[
             // 0: A
-            Vertex {
+            ShapeVertex {
                 position: [-0.0868241, 0.49240386, 0.0],
                 tex_coords: [0.4131759, 1.0 - 0.99240386],
             },
             // 1: B
-            Vertex {
+            ShapeVertex {
                 position: [-0.49513406, 0.06958647, 0.0],
                 tex_coords: [0.0048659444, 1.0 - 0.56958647],
             },
             // 2: C
-            Vertex {
+            ShapeVertex {
                 position: [-0.21918549, -0.44939706, 0.0],
                 tex_coords: [0.28081453, 1.0 - 0.05060294],
             },
             // 3: D
-            Vertex {
+            ShapeVertex {
                 position: [0.35966998, -0.3473291, 0.0],
                 tex_coords: [0.85967, 1.0 - 0.1526709],
             },
             // 4: E
-            Vertex {
+            ShapeVertex {
                 position: [0.44147372, 0.2347359, 0.0],
                 tex_coords: [0.9414737, 1.0 - 0.7347359],
             }, // E
@@ -114,5 +122,68 @@ impl Shapes {
 
     pub fn get(&self, _is_challenge: bool) -> &Shape {
         &self.normal
+    }
+}
+
+#[repr(C)]
+#[derive(Copy, Clone, Debug, bytemuck::Pod, bytemuck::Zeroable)]
+pub struct ModelVertex {
+    pub position: [f32; 3],
+    pub tex_coords: [f32; 2],
+    pub normal: [f32; 3],
+}
+
+impl ModelVertex {
+    const ATTRIBUTES: [wgpu::VertexAttribute; 3] =
+        wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x2, 2 => Float32x3];
+}
+
+impl Vertex for ModelVertex {
+    fn desc() -> wgpu::VertexBufferLayout<'static> {
+        use std::mem;
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<ModelVertex>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Vertex,
+            attributes: &Self::ATTRIBUTES,
+        }
+    }
+}
+
+pub struct Model {
+    pub meshes: Vec<Mesh>,
+    pub materials: Vec<Material>,
+}
+
+pub struct Material {
+    pub name: String,
+    pub diffuse_texture: textures::Texture,
+    pub bind_group: wgpu::BindGroup,
+}
+
+pub struct Mesh {
+    pub name: String,
+    pub vertex_buffer: wgpu::Buffer,
+    pub index_buffer: wgpu::Buffer,
+    pub num_elements: u32,
+    pub material: usize,
+}
+
+pub trait DrawModel<'a> {
+    fn draw_mesh(&mut self, mesh: &'a Mesh);
+    fn draw_mesh_instanced(&mut self, mesh: &'a Mesh, instances: Range<u32>);
+}
+
+impl<'a, 'b> DrawModel<'a> for wgpu::RenderPass<'b>
+where
+    'b: 'a,
+{
+    fn draw_mesh(&mut self, mesh: &'a Mesh) {
+        self.draw_mesh_instanced(mesh, 0..1);
+    }
+
+    fn draw_mesh_instanced(&mut self, mesh: &'a Mesh, instances: Range<u32>) {
+        self.set_vertex_buffer(0, mesh.vertex_buffer.slice(..));
+        self.set_index_buffer(mesh.index_buffer.slice(..), wgpu::IndexFormat::Uint32);
+        self.draw_indexed(0..mesh.num_elements, 0, instances);
     }
 }

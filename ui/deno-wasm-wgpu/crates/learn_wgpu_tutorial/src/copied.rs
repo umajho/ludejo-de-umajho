@@ -1,7 +1,7 @@
 use wgpu::util::DeviceExt;
 use winit::keyboard::KeyCode;
 
-use crate::{Camera, models::Vertex, textures};
+use crate::{Camera, models::ShapeVertex, textures};
 
 pub struct CameraController {
     speed: f32,
@@ -89,20 +89,20 @@ pub struct DepthPass {
 }
 
 impl DepthPass {
-    const DEPTH_VERTICES: &[Vertex] = &[
-        Vertex {
+    const DEPTH_VERTICES: &[ShapeVertex] = &[
+        ShapeVertex {
             position: [0.0, 0.0, 0.0],
             tex_coords: [0.0, 1.0],
         },
-        Vertex {
+        ShapeVertex {
             position: [1.0, 0.0, 0.0],
             tex_coords: [1.0, 1.0],
         },
-        Vertex {
+        ShapeVertex {
             position: [1.0, 1.0, 0.0],
             tex_coords: [1.0, 0.0],
         },
-        Vertex {
+        ShapeVertex {
             position: [0.0, 1.0, 0.0],
             tex_coords: [0.0, 0.0],
         },
@@ -181,7 +181,7 @@ impl DepthPass {
             vertex: wgpu::VertexState {
                 module: shader,
                 entry_point: Some("vs_main"),
-                buffers: &[Vertex::desc()],
+                buffers: &[ShapeVertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             },
             fragment: Some(wgpu::FragmentState {
