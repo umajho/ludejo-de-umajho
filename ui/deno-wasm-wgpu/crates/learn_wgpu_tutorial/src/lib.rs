@@ -24,7 +24,7 @@ use winit::{
     window::Window,
 };
 
-use crate::models::{DrawModel, Model, ShapeVertex, Shapes};
+use crate::models::{DrawModel, Model, ModelVertex, ShapeVertex, Shapes, Vertex};
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
@@ -429,7 +429,7 @@ impl RenderPipelines {
                 module: shader,
                 entry_point: Some("vs_main"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[ShapeVertex::desc(), InstanceRaw::desc()],
+                buffers: &[ModelVertex::desc(), InstanceRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,

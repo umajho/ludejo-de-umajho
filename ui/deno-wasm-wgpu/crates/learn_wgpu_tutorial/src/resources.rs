@@ -109,7 +109,7 @@ impl<T: rust_embed::RustEmbed> ResLoader<T> {
                             m.mesh.positions[i * 3 + 1],
                             m.mesh.positions[i * 3 + 2],
                         ],
-                        tex_coords: [m.mesh.texcoords[i * 2], m.mesh.texcoords[i * 2 + 1]],
+                        tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
                         normal: if m.mesh.normals.is_empty() {
                             [0.0, 0.0, 0.0]
                         } else {
