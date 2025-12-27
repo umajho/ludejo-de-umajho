@@ -151,7 +151,7 @@ impl State {
             width: size.width,
             height: size.height,
             present_mode: surface_caps.present_modes[0],
-            alpha_mode: surface_caps.alpha_modes[0],
+            alpha_mode: wgpu::CompositeAlphaMode::PostMultiplied,
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
@@ -159,6 +159,8 @@ impl State {
         let diffuse_bytes = include_bytes!("happy-tree.png");
         let diffuse_texture =
             textures::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png")?;
+
+        let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
 
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -179,6 +181,22 @@ impl State {
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 2,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Depth,
+                            view_dimension: wgpu::TextureViewDimension::D2,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 3,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
+                        count: None,
+                    },
                 ],
                 label: Some("texture_bind_group_layout"),
             });
@@ -192,6 +210,14 @@ impl State {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 2,
+                    resource: wgpu::BindingResource::TextureView(&depth_texture.view),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 3,
+                    resource: wgpu::BindingResource::Sampler(&depth_texture.sampler),
                 },
             ],
             label: Some("diffuse_bind_group"),
@@ -240,8 +266,6 @@ impl State {
         });
 
         let camera_control = copied::CameraController::new(0.2);
-
-        let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
 
         let render_pipelines = RenderPipelines::new(
             &device,
@@ -428,7 +452,7 @@ impl RenderPipelines {
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
-                    blend: Some(wgpu::BlendState::REPLACE),
+                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
