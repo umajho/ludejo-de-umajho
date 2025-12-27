@@ -43,14 +43,8 @@ fn vs_main(
 var t_diffuse: texture_2d<f32>;
 @group(0) @binding(1)
 var s_diffuse: sampler;
-@group(0) @binding(2)
-var t_depth: texture_depth_2d;
-@group(0) @binding(3)
-var s_depth: sampler_comparison;
 
 @fragment
 fn fs_main(in: VertexOutput) -> @location(0) vec4<f32> {
-  let diffuse_color = textureSample(t_diffuse, s_diffuse, in.tex_coords);
-  let depth_comparison = textureSampleCompare(t_depth, s_depth, in.tex_coords, 0.0);
-  return vec4<f32>(diffuse_color.rgb, depth_comparison);
+  return textureSample(t_diffuse, s_diffuse, in.tex_coords);
 }

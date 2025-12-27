@@ -24,7 +24,6 @@ use winit::{
 };
 
 use crate::shapes::{Shapes, Vertex};
-use crate::textures::Texture;
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
@@ -101,7 +100,7 @@ pub struct State {
     camera_buffer: wgpu::Buffer,
     camera_control: copied::CameraController,
     camera_bind_group: wgpu::BindGroup,
-    depth_texture: Texture,
+    depth_pass: copied::DepthPass,
     instances: Instances,
     window: Arc<Window>,
 
@@ -160,8 +159,6 @@ impl State {
         let diffuse_texture =
             textures::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png")?;
 
-        let depth_texture = Texture::create_depth_texture(&device, &config, "depth_texture");
-
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -181,22 +178,6 @@ impl State {
                         ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
                         count: None,
                     },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 2,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Texture {
-                            sample_type: wgpu::TextureSampleType::Depth,
-                            view_dimension: wgpu::TextureViewDimension::D2,
-                            multisampled: false,
-                        },
-                        count: None,
-                    },
-                    wgpu::BindGroupLayoutEntry {
-                        binding: 3,
-                        visibility: wgpu::ShaderStages::FRAGMENT,
-                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Comparison),
-                        count: None,
-                    },
                 ],
                 label: Some("texture_bind_group_layout"),
             });
@@ -210,14 +191,6 @@ impl State {
                 wgpu::BindGroupEntry {
                     binding: 1,
                     resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 2,
-                    resource: wgpu::BindingResource::TextureView(&depth_texture.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 3,
-                    resource: wgpu::BindingResource::Sampler(&depth_texture.sampler),
                 },
             ],
             label: Some("diffuse_bind_group"),
@@ -271,6 +244,13 @@ impl State {
             &device,
             &config,
             &[&texture_bind_group_layout, &camera_bind_group_layout],
+            &device.create_shader_module(wgpu::include_wgsl!("shader.wgsl")),
+        );
+
+        let depth_pass = copied::DepthPass::new(
+            &device,
+            &config,
+            &device.create_shader_module(wgpu::include_wgsl!("depth.wgsl")),
         );
 
         let shapes = Shapes::new(&device);
@@ -292,7 +272,7 @@ impl State {
             camera_buffer,
             camera_bind_group,
             camera_control,
-            depth_texture,
+            depth_pass,
             instances,
             window,
 
@@ -309,8 +289,7 @@ impl State {
 
             self.camera.update_aspect(width, height);
 
-            self.depth_texture =
-                Texture::create_depth_texture(&self.device, &self.config, "depth_texture");
+            self.depth_pass.resize(&self.device, &self.config);
         }
     }
 
@@ -365,7 +344,7 @@ impl State {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_texture.view,
+                    view: &self.depth_pass.texture.view,
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
@@ -387,6 +366,8 @@ impl State {
 
             render_pass.draw_indexed(0..shape.num_indices(), 0, 0..self.instances.len() as u32);
         }
+
+        self.depth_pass.render(&view, &mut encoder);
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
@@ -414,21 +395,17 @@ impl RenderPipelines {
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
         bind_group_layouts: &[&wgpu::BindGroupLayout],
+        shader: &wgpu::ShaderModule,
     ) -> Self {
         Self {
-            normal: Self::new_pipeline(
-                device,
-                config,
-                device.create_shader_module(wgpu::include_wgsl!("shader.wgsl")),
-                bind_group_layouts,
-            ),
+            normal: Self::new_pipeline(device, config, shader, bind_group_layouts),
         }
     }
 
     fn new_pipeline(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
-        shader: wgpu::ShaderModule,
+        shader: &wgpu::ShaderModule,
         bind_group_layouts: &[&wgpu::BindGroupLayout],
     ) -> wgpu::RenderPipeline {
         let render_pipeline_layout =
@@ -442,13 +419,13 @@ impl RenderPipelines {
             label: Some("Render Pipeline"),
             layout: Some(&render_pipeline_layout),
             vertex: wgpu::VertexState {
-                module: &shader,
+                module: shader,
                 entry_point: Some("vs_main"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
                 buffers: &[Vertex::desc(), InstanceRaw::desc()],
             },
             fragment: Some(wgpu::FragmentState {
-                module: &shader,
+                module: shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
@@ -471,7 +448,11 @@ impl RenderPipelines {
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::Less,
                 stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState::default(),
+                bias: wgpu::DepthBiasState {
+                    constant: 2, // Corresponds to bilinear filtering
+                    slope_scale: 2.0,
+                    clamp: 0.0,
+                },
             }),
             multisample: wgpu::MultisampleState {
                 count: 1,
