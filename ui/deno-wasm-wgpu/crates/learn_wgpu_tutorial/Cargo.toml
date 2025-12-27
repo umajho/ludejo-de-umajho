@@ -13,6 +13,8 @@ image = { version = "0.25.9", default-features = false, features = [
   "jpeg",
 ] }
 log = "0.4.29"
+# disabled vek because: https://github.com/yoanlcq/vek/issues/96
+mmd = { version = "0.0.6", default-features = false, features = ["arrayvec"] }
 pollster = "0.4.0"
 rust-embed = "8.9.0"
 tobj = { version = "4.0.3", default-features = false, features = ["async"] }

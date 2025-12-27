@@ -236,10 +236,19 @@ impl State {
             &device.create_shader_module(wgpu::include_wgsl!("depth.wgsl")),
         );
 
-        let obj_res_loader = resources::EmbedResLoader::<resources::ResCube>::new("cube");
-        let obj_model_loader = resources::ObjLoader::new(obj_res_loader);
-        let obj_model =
-            obj_model_loader.load_model("cube.obj", &device, &queue, &texture_bind_group_layout)?;
+        // let obj_res_loader = resources::EmbedResLoader::<resources::ResCube>::new("cube");
+        // let obj_model_loader = resources::ObjLoader::new(obj_res_loader);
+        // let obj_model =
+        //     obj_model_loader.load_model("cube.obj", &device, &queue, &texture_bind_group_layout)?;
+
+        let obj_res_loader = resources::EmbedResLoader::<resources::ResAoi>::new("aoi");
+        let obj_model_loader = resources::PmxLoader::new(obj_res_loader);
+        let obj_model = obj_model_loader.load_model(
+            "A.I.VOICE_琴葉葵_ver1.02.pmx",
+            &device,
+            &queue,
+            &texture_bind_group_layout,
+        )?;
 
         const NUM_INSTANCES_PER_ROW: u32 = 10;
         let instances = Instances::new(&device, NUM_INSTANCES_PER_ROW as usize);
