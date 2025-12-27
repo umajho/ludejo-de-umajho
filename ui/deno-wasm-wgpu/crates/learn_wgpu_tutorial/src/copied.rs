@@ -1,7 +1,7 @@
 use wgpu::util::DeviceExt;
 use winit::keyboard::KeyCode;
 
-use crate::{Camera, shapes::Vertex, textures};
+use crate::{Camera, models::Vertex, textures};
 
 pub struct CameraController {
     speed: f32,

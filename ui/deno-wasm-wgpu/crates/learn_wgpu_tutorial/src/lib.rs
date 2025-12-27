@@ -2,7 +2,7 @@
 #![feature(decl_macro)]
 
 mod copied;
-mod shapes;
+mod models;
 mod textures;
 mod utils;
 
@@ -23,7 +23,7 @@ use winit::{
     window::Window,
 };
 
-use crate::shapes::{Shapes, Vertex};
+use crate::models::{Shapes, Vertex};
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
