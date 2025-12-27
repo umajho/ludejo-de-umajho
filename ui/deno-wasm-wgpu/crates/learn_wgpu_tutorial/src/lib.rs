@@ -25,6 +25,7 @@ use winit::{
 };
 
 use crate::models::{DrawModel, Model, ModelVertex, Vertex};
+use crate::resources::ModelLoader;
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
@@ -235,7 +236,8 @@ impl State {
             &device.create_shader_module(wgpu::include_wgsl!("depth.wgsl")),
         );
 
-        let obj_model_loader = resources::ResLoader::<resources::ResCube>::new("cube");
+        let obj_res_loader = resources::EmbedResLoader::<resources::ResCube>::new("cube");
+        let obj_model_loader = resources::ObjLoader::new(obj_res_loader);
         let obj_model =
             obj_model_loader.load_model("cube.obj", &device, &queue, &texture_bind_group_layout)?;
 

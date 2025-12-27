@@ -13,17 +13,29 @@ use crate::{
 #[folder = "res/cube"]
 pub struct ResCube;
 
-pub struct ResLoader<T: rust_embed::RustEmbed> {
+pub trait ResLoader {
+    fn name(&self) -> &str;
+    fn load_binary(&self, filename: &str) -> anyhow::Result<Vec<u8>>;
+    fn load_string(&self, filename: &str) -> anyhow::Result<String>;
+}
+
+pub struct EmbedResLoader<T: rust_embed::RustEmbed> {
     name: &'static str,
     _marker: std::marker::PhantomData<T>,
 }
 
-impl<T: rust_embed::RustEmbed> ResLoader<T> {
+impl<T: rust_embed::RustEmbed> EmbedResLoader<T> {
     pub fn new(name: &'static str) -> Self {
         Self {
             name,
             _marker: std::marker::PhantomData,
         }
+    }
+}
+
+impl<T: rust_embed::RustEmbed> ResLoader for EmbedResLoader<T> {
+    fn name(&self) -> &str {
+        self.name
     }
 
     fn load_binary(&self, filename: &str) -> anyhow::Result<Vec<u8>> {
@@ -38,26 +50,54 @@ impl<T: rust_embed::RustEmbed> ResLoader<T> {
         let s = std::str::from_utf8(&file.data)?;
         Ok(s.to_string())
     }
+}
 
-    pub fn load_texture(
+pub trait ModelLoader {
+    fn load_texture(
+        &self,
+        filename: &str,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> anyhow::Result<textures::Texture>;
+    fn load_model(
+        &self,
+        filename: &str,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+        layout: &wgpu::BindGroupLayout,
+    ) -> anyhow::Result<Model>;
+}
+
+pub struct ObjLoader<T: ResLoader> {
+    res_loader: T,
+}
+
+impl<T: ResLoader> ObjLoader<T> {
+    pub fn new(res_loader: T) -> Self {
+        Self { res_loader }
+    }
+}
+
+impl<T: ResLoader> ModelLoader for ObjLoader<T> {
+    fn load_texture(
         &self,
         filename: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
     ) -> anyhow::Result<textures::Texture> {
-        let data = self.load_binary(filename)?;
+        let data = self.res_loader.load_binary(filename)?;
         let texture = textures::Texture::from_bytes(device, queue, &data, filename)?;
         Ok(texture)
     }
 
-    pub fn load_model(
+    fn load_model(
         &self,
         filename: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         layout: &wgpu::BindGroupLayout,
     ) -> anyhow::Result<Model> {
-        let obj_text = self.load_binary(filename)?;
+        let obj_text = self.res_loader.load_binary(filename)?;
         let obj_cursor = Cursor::new(obj_text);
         let mut obj_reader = BufReader::new(obj_cursor);
 
@@ -69,7 +109,7 @@ impl<T: rust_embed::RustEmbed> ResLoader<T> {
                 ..Default::default()
             },
             move |p| {
-                let mat_text = self.load_string(p.to_str().unwrap()).unwrap();
+                let mat_text = self.res_loader.load_string(p.to_str().unwrap()).unwrap();
                 tobj::load_mtl_buf(&mut BufReader::new(Cursor::new(mat_text)))
             },
         )?;
@@ -123,12 +163,20 @@ impl<T: rust_embed::RustEmbed> ResLoader<T> {
                     .collect::<Vec<_>>();
 
                 let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("#{}/{} Vertex Buffer", self.name, filename)),
+                    label: Some(&format!(
+                        "#{}/{} Vertex Buffer",
+                        self.res_loader.name(),
+                        filename
+                    )),
                     contents: bytemuck::cast_slice(&vertices),
                     usage: wgpu::BufferUsages::VERTEX,
                 });
                 let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("#{}/{} Index Buffer", self.name, filename)),
+                    label: Some(&format!(
+                        "#{}/{} Index Buffer",
+                        self.res_loader.name(),
+                        filename
+                    )),
                     contents: bytemuck::cast_slice(&m.mesh.indices),
                     usage: wgpu::BufferUsages::INDEX,
                 });
