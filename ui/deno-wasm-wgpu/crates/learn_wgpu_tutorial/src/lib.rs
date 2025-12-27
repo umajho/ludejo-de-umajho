@@ -24,7 +24,7 @@ use winit::{
     window::Window,
 };
 
-use crate::models::{DrawModel, Model, ModelVertex, ShapeVertex, Shapes, Vertex};
+use crate::models::{DrawModel, Model, ModelVertex, Vertex};
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
@@ -94,9 +94,7 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
     render_pipelines: RenderPipelines,
-    shapes: Shapes,
     obj_model: Model,
-    diffuse_bind_group: wgpu::BindGroup,
     camera: Camera,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
@@ -157,10 +155,6 @@ impl State {
             desired_maximum_frame_latency: 2,
         };
 
-        let diffuse_bytes = include_bytes!("happy-tree.png");
-        let diffuse_texture =
-            textures::Texture::from_bytes(&device, &queue, diffuse_bytes, "happy-tree.png")?;
-
         let texture_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[
@@ -183,20 +177,6 @@ impl State {
                 ],
                 label: Some("texture_bind_group_layout"),
             });
-        let diffuse_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &texture_bind_group_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                },
-            ],
-            label: Some("diffuse_bind_group"),
-        });
 
         let camera = Camera {
             eye: (0.0, 1.0, 2.0).into(),
@@ -255,8 +235,6 @@ impl State {
             &device.create_shader_module(wgpu::include_wgsl!("depth.wgsl")),
         );
 
-        let shapes = Shapes::new(&device);
-
         let obj_model_loader = resources::ResLoader::<resources::ResCube>::new("cube");
         let obj_model =
             obj_model_loader.load_model("cube.obj", &device, &queue, &texture_bind_group_layout)?;
@@ -271,9 +249,7 @@ impl State {
             config,
             is_surface_configured: false,
             render_pipelines,
-            shapes,
             obj_model,
-            diffuse_bind_group,
             camera,
             camera_uniform,
             camera_buffer,
