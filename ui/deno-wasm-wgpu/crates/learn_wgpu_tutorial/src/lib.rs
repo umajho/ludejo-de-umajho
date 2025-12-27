@@ -100,12 +100,8 @@ pub struct State {
     camera_buffer: wgpu::Buffer,
     camera_control: copied::CameraController,
     camera_bind_group: wgpu::BindGroup,
-    model_operation: ModelOperation,
-    model_operation_buffer: wgpu::Buffer,
-    model_operation_bind_group: wgpu::BindGroup,
     window: Arc<Window>,
-    instances: Vec<Instance>,
-    instance_buffer: wgpu::Buffer,
+    instances: Instances,
 
     is_challenge: bool,
 }
@@ -243,80 +239,16 @@ impl State {
 
         let camera_control = copied::CameraController::new(0.2);
 
-        let model_operation = ModelOperation {
-            rotation_matrix: cgmath::Matrix4::identity().into(),
-        };
-
-        let model_operation_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Model Operation Buffer"),
-            contents: bytemuck::cast_slice(&[model_operation]),
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-        });
-
-        let model_operation_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                entries: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                }],
-                label: Some("model_operation_bind_group_layout"),
-            });
-        let model_operation_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &model_operation_bind_group_layout,
-            entries: &[wgpu::BindGroupEntry {
-                binding: 0,
-                resource: model_operation_buffer.as_entire_binding(),
-            }],
-            label: Some("model_operation_bind_group"),
-        });
-
         let render_pipelines = RenderPipelines::new(
             &device,
             &config,
-            &[
-                &texture_bind_group_layout,
-                &camera_bind_group_layout,
-                &model_operation_bind_group_layout,
-            ],
+            &[&texture_bind_group_layout, &camera_bind_group_layout],
         );
 
         let shapes = Shapes::new(&device);
 
-        let instances = (0..NUM_INSTANCES_PER_ROW)
-            .flat_map(|z| {
-                (0..NUM_INSTANCES_PER_ROW).map(move |x| {
-                    let position = cgmath::Vector3 {
-                        x: x as f32,
-                        y: 0.0,
-                        z: z as f32,
-                    } - INSTANCE_DISPLACEMENT;
-
-                    let rotation = if position.is_zero() {
-                        cgmath::Quaternion::from_axis_angle(
-                            cgmath::Vector3::unit_z(),
-                            cgmath::Deg(0.0),
-                        )
-                    } else {
-                        cgmath::Quaternion::from_axis_angle(position.normalize(), cgmath::Deg(45.0))
-                    };
-
-                    Instance { position, rotation }
-                })
-            })
-            .collect::<Vec<_>>();
-
-        let instance_data = instances.iter().map(InstanceRaw::from).collect::<Vec<_>>();
-        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Instance Buffer"),
-            contents: bytemuck::cast_slice(&instance_data),
-            usage: wgpu::BufferUsages::VERTEX,
-        });
+        const NUM_INSTANCES_PER_ROW: u32 = 10;
+        let instances = Instances::new(&device, NUM_INSTANCES_PER_ROW as usize);
 
         Ok(Self {
             surface,
@@ -332,12 +264,8 @@ impl State {
             camera_buffer,
             camera_bind_group,
             camera_control,
-            model_operation,
-            model_operation_buffer,
-            model_operation_bind_group,
             window,
             instances,
-            instance_buffer,
 
             is_challenge: false,
         })
@@ -355,6 +283,8 @@ impl State {
     }
 
     pub fn update(&mut self) {
+        let now_ms = utils::now_ms();
+
         self.camera_control.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
         self.queue.write_buffer(
@@ -363,14 +293,7 @@ impl State {
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
 
-        let theta = (utils::now_ms() % 1000) as f32 / 1000.0 * std::f32::consts::TAU;
-        self.model_operation.rotation_matrix =
-            cgmath::Matrix4::from_angle_y(cgmath::Rad(theta)).into();
-        self.queue.write_buffer(
-            &self.model_operation_buffer,
-            0,
-            bytemuck::cast_slice(&[self.model_operation]),
-        );
+        self.instances.update(&self.device, now_ms);
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -417,11 +340,10 @@ impl State {
             render_pass.set_pipeline(self.render_pipelines.get(self.is_challenge));
             render_pass.set_bind_group(0, &self.diffuse_bind_group, &[]);
             render_pass.set_bind_group(1, &self.camera_bind_group, &[]);
-            render_pass.set_bind_group(2, &self.model_operation_bind_group, &[]);
 
             let shape = self.shapes.get(self.is_challenge);
             render_pass.set_vertex_buffer(0, shape.vertex_buffer().slice(..));
-            render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
+            render_pass.set_vertex_buffer(1, self.instances.instance_buffer.slice(..));
             render_pass.set_index_buffer(shape.index_buffer().slice(..), wgpu::IndexFormat::Uint16);
 
             render_pass.draw_indexed(0..shape.num_indices(), 0, 0..self.instances.len() as u32);
@@ -539,12 +461,6 @@ impl CameraUniform {
     }
 }
 
-#[repr(C)]
-#[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
-struct ModelOperation {
-    rotation_matrix: [[f32; 4]; 4],
-}
-
 struct Instance {
     position: cgmath::Vector3<f32>,
     rotation: cgmath::Quaternion<f32>,
@@ -583,12 +499,91 @@ impl InstanceRaw {
     }
 }
 
-const NUM_INSTANCES_PER_ROW: u32 = 10;
-const INSTANCE_DISPLACEMENT: cgmath::Vector3<f32> = cgmath::Vector3::new(
-    NUM_INSTANCES_PER_ROW as f32 * 0.5,
-    0.0,
-    NUM_INSTANCES_PER_ROW as f32 * 0.5,
-);
+struct Instances {
+    instances: Vec<Instance>,
+    instance_buffer: wgpu::Buffer,
+
+    instances_per_row: usize,
+    instance_displacement: cgmath::Vector3<f32>,
+}
+
+impl Instances {
+    fn new(device: &wgpu::Device, instances_per_row: usize) -> Self {
+        let instance_displacement = cgmath::Vector3::new(
+            instances_per_row as f32 * 0.5,
+            0.0,
+            instances_per_row as f32 * 0.5,
+        );
+
+        let instances = (0..instances_per_row)
+            .flat_map(|_z| {
+                (0..instances_per_row).map(move |_x| Instance {
+                    position: cgmath::Vector3::zero(),
+                    rotation: cgmath::Quaternion::from_axis_angle(
+                        cgmath::Vector3::unit_z(),
+                        cgmath::Deg(0.0),
+                    ),
+                })
+            })
+            .collect::<Vec<_>>();
+
+        let instance_buffer = Self::new_buffer(device, &instances);
+
+        let mut v = Self {
+            instances,
+            instance_buffer,
+            instances_per_row,
+            instance_displacement,
+        };
+
+        v.update(device, 0);
+        v
+    }
+
+    fn len(&self) -> usize {
+        self.instances.len()
+    }
+
+    const AMPLITUDE: f32 = 0.5;
+
+    fn update(&mut self, device: &wgpu::Device, now_ms: u64) {
+        let progress = (now_ms % 1000) as f32 / 1000.0;
+
+        for i in 0..self.instances_per_row {
+            for j in 0..self.instances_per_row {
+                let local_progress = (i as f32 * self.instances_per_row as f32 + j as f32)
+                    / (self.instances_per_row * self.instances_per_row) as f32
+                    + progress;
+
+                let instance = &mut self.instances[i * self.instances_per_row + j];
+
+                let position = cgmath::Vector3 {
+                    x: i as f32,
+                    y: Self::AMPLITUDE * (local_progress * std::f32::consts::TAU).sin(),
+                    z: j as f32,
+                } - self.instance_displacement;
+                let rotation = cgmath::Quaternion::from_axis_angle(
+                    cgmath::Vector3::unit_y(),
+                    cgmath::Rad(progress * std::f32::consts::TAU),
+                );
+
+                instance.position = position;
+                instance.rotation = rotation;
+            }
+        }
+
+        self.instance_buffer = Self::new_buffer(device, &self.instances);
+    }
+
+    fn new_buffer(device: &wgpu::Device, instances: &[Instance]) -> wgpu::Buffer {
+        let instance_data = instances.iter().map(InstanceRaw::from).collect::<Vec<_>>();
+        device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        })
+    }
+}
 
 pub struct App {
     #[cfg(target_arch = "wasm32")]
