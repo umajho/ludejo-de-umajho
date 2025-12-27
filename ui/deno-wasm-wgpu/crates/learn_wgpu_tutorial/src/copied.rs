@@ -255,6 +255,7 @@ impl DepthPass {
         });
     }
 
+    #[allow(unused)]
     pub fn render(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Depth Visual Render Pass"),

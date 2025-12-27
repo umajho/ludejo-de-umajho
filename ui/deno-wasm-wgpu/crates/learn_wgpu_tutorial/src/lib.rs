@@ -367,7 +367,7 @@ impl State {
             render_pass.draw_indexed(0..shape.num_indices(), 0, 0..self.instances.len() as u32);
         }
 
-        self.depth_pass.render(&view, &mut encoder);
+        // self.depth_pass.render(&view, &mut encoder);
 
         self.queue.submit(std::iter::once(encoder.finish()));
         output.present();
