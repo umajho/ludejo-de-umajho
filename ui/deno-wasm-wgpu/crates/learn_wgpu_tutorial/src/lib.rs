@@ -150,7 +150,7 @@ impl State {
             width: size.width,
             height: size.height,
             present_mode: surface_caps.present_modes[0],
-            alpha_mode: wgpu::CompositeAlphaMode::PostMultiplied,
+            alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
             desired_maximum_frame_latency: 2,
         };
@@ -429,7 +429,7 @@ impl RenderPipelines {
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
-                    blend: Some(wgpu::BlendState::ALPHA_BLENDING),
+                    blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
