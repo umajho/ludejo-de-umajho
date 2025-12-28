@@ -209,7 +209,7 @@ impl State {
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
-                    visibility: wgpu::ShaderStages::VERTEX,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
                     ty: wgpu::BindingType::Buffer {
                         ty: wgpu::BufferBindingType::Uniform,
                         has_dynamic_offset: false,
@@ -578,17 +578,20 @@ impl RenderPipelines {
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
+    view_position: [f32; 4],
     view_proj: [[f32; 4]; 4],
 }
 
 impl CameraUniform {
     fn new() -> Self {
         Self {
+            view_position: [0.0; 4],
             view_proj: cgmath::Matrix4::identity().into(),
         }
     }
 
     fn update_view_proj(&mut self, camera: &Camera) {
+        self.view_position = camera.eye.to_homogeneous().into();
         self.view_proj = camera.build_view_projection_matrix().into();
     }
 }
@@ -602,6 +605,7 @@ struct Instance {
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct InstanceRaw {
     model: [[f32; 4]; 4],
+    normal: [[f32; 3]; 3],
 }
 
 impl From<&Instance> for InstanceRaw {
@@ -610,16 +614,20 @@ impl From<&Instance> for InstanceRaw {
             model: (cgmath::Matrix4::from_translation(value.position)
                 * cgmath::Matrix4::from(value.rotation))
             .into(),
+            normal: cgmath::Matrix3::from(value.rotation).into(),
         }
     }
 }
 
 impl InstanceRaw {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 4] = wgpu::vertex_attr_array![
+    const ATTRIBUTES: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
         5 => Float32x4,
         6 => Float32x4,
         7 => Float32x4,
-        8 => Float32x4
+        8 => Float32x4,
+        9 => Float32x3,
+        10 => Float32x3,
+        11 => Float32x3,
     ];
 
     const fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -682,6 +690,7 @@ impl Instances {
         const SPACE_BETWEEN: f32 = 3.0;
 
         let progress = (now_ms % 1000) as f32 / 1000.0;
+        // let progress = 0.0;
 
         for i in 0..self.instances_per_row {
             for j in 0..self.instances_per_row {
@@ -700,8 +709,8 @@ impl Instances {
                     z,
                 } - self.instance_displacement;
                 let rotation = cgmath::Quaternion::from_axis_angle(
-                    cgmath::Vector3::unit_y(),
-                    cgmath::Rad(progress * std::f32::consts::TAU),
+                    (cgmath::Vector3::unit_y() + cgmath::Vector3::unit_x()).normalize(),
+                    cgmath::Rad(local_progress * std::f32::consts::TAU),
                 );
 
                 instance.position = position;
