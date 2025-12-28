@@ -452,7 +452,7 @@ impl State {
 }
 
 pub struct RenderPipelines {
-    main_normal: wgpu::RenderPipeline,
+    main_regular: wgpu::RenderPipeline,
 
     light: wgpu::RenderPipeline,
 }
@@ -465,7 +465,7 @@ impl RenderPipelines {
         camera_bind_group_layout: &wgpu::BindGroupLayout,
         light_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let main_normal_pipeline = {
+        let main_regular_pipeline = {
             let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
@@ -504,7 +504,7 @@ impl RenderPipelines {
         };
 
         Self {
-            main_normal: main_normal_pipeline,
+            main_regular: main_regular_pipeline,
             light: light_pipeline,
         }
     }
@@ -567,7 +567,7 @@ impl RenderPipelines {
     }
 
     pub fn main(&self, _is_challenge: bool) -> &wgpu::RenderPipeline {
-        &self.main_normal
+        &self.main_regular
     }
 
     pub fn light(&self) -> &wgpu::RenderPipeline {
