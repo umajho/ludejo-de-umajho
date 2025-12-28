@@ -315,9 +315,9 @@ impl<T: ResLoader> ModelLoader for PmxLoader<T> {
                     } else {
                         let v = &pmx_vertices[global_vertex_index as usize];
                         let vertex = ModelVertex {
-                            position: [v.position[0], v.position[1], v.position[2]],
+                            position: v.position.into(),
                             tex_coords: [v.uv[0], 1.0 - v.uv[1]],
-                            normal: [v.normal[0], v.normal[1], v.normal[2]],
+                            normal: v.normal.into(),
                         };
                         let local_index = vertices.len() as u32;
                         vertices.push(vertex);
