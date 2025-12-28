@@ -101,9 +101,15 @@ pub struct State {
     camera_buffer: wgpu::Buffer,
     camera_control: copied::CameraController,
     camera_bind_group: wgpu::BindGroup,
+    light_uniform: LightUniform,
+    light_buffer: wgpu::Buffer,
+    light_bind_group: wgpu::BindGroup,
     depth_pass: copied::DepthPass,
     instances: Instances,
+
     window: Arc<Window>,
+
+    update_time_ms: u64,
 
     is_challenge: bool,
 }
@@ -224,11 +230,48 @@ impl State {
 
         let camera_control = copied::CameraController::new(0.2);
 
+        let light_uniform = LightUniform {
+            position: [2.0, 2.0, 2.0],
+            _padding: 0,
+            color: [1.0, 1.0, 1.0],
+            _padding2: 0,
+        };
+
+        let light_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Light VB"),
+            contents: bytemuck::cast_slice(&[light_uniform]),
+            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
+        });
+
+        let light_bind_group_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                entries: &[wgpu::BindGroupLayoutEntry {
+                    binding: 0,
+                    visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
+                    ty: wgpu::BindingType::Buffer {
+                        ty: wgpu::BufferBindingType::Uniform,
+                        has_dynamic_offset: false,
+                        min_binding_size: None,
+                    },
+                    count: None,
+                }],
+                label: None,
+            });
+        let light_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &light_bind_group_layout,
+            entries: &[wgpu::BindGroupEntry {
+                binding: 0,
+                resource: light_buffer.as_entire_binding(),
+            }],
+            label: None,
+        });
+
         let render_pipelines = RenderPipelines::new(
             &device,
             &config,
-            &[&texture_bind_group_layout, &camera_bind_group_layout],
-            &device.create_shader_module(wgpu::include_wgsl!("shader.wgsl")),
+            &texture_bind_group_layout,
+            &camera_bind_group_layout,
+            &light_bind_group_layout,
         );
 
         let depth_pass = copied::DepthPass::new(
@@ -237,19 +280,19 @@ impl State {
             &device.create_shader_module(wgpu::include_wgsl!("depth.wgsl")),
         );
 
-        // let obj_res_loader = resources::EmbedResLoader::<resources::ResCube>::new("cube");
-        // let obj_model_loader = resources::ObjLoader::new(obj_res_loader);
-        // let obj_model =
-        //     obj_model_loader.load_model("cube.obj", &device, &queue, &texture_bind_group_layout)?;
+        let obj_res_loader = resources::EmbedResLoader::<resources::ResCube>::new("cube");
+        let obj_model_loader = resources::ObjLoader::new(obj_res_loader);
+        let obj_model =
+            obj_model_loader.load_model("cube.obj", &device, &queue, &texture_bind_group_layout)?;
 
-        let obj_res_loader = resources::EmbedResLoader::<resources::ResAoi>::new("aoi");
-        let obj_model_loader = resources::PmxLoader::new(obj_res_loader);
-        let obj_model = obj_model_loader.load_model(
-            "A.I.VOICE_琴葉葵_ver1.02.pmx",
-            &device,
-            &queue,
-            &texture_bind_group_layout,
-        )?;
+        // let obj_res_loader = resources::EmbedResLoader::<resources::ResAoi>::new("aoi");
+        // let obj_model_loader = resources::PmxLoader::new(obj_res_loader);
+        // let obj_model = obj_model_loader.load_model(
+        //     "A.I.VOICE_琴葉葵_ver1.02.pmx",
+        //     &device,
+        //     &queue,
+        //     &texture_bind_group_layout,
+        // )?;
 
         const NUM_INSTANCES_PER_ROW: u32 = 10;
         let instances = Instances::new(&device, NUM_INSTANCES_PER_ROW as usize);
@@ -267,8 +310,14 @@ impl State {
             camera_buffer,
             camera_bind_group,
             camera_control,
+            light_uniform,
+            light_buffer,
+            light_bind_group,
             depth_pass,
             instances,
+
+            update_time_ms: utils::now_ms(),
+
             window,
 
             is_challenge: false,
@@ -289,7 +338,8 @@ impl State {
     }
 
     pub fn update(&mut self) {
-        let now_ms = utils::now_ms();
+        let last_update_time_ms = core::mem::replace(&mut self.update_time_ms, utils::now_ms());
+        let time_delta_ms = self.update_time_ms - last_update_time_ms;
 
         self.camera_control.update_camera(&mut self.camera);
         self.camera_uniform.update_view_proj(&self.camera);
@@ -299,7 +349,21 @@ impl State {
             bytemuck::cast_slice(&[self.camera_uniform]),
         );
 
-        self.instances.update(&self.device, now_ms);
+        {
+            let old_position: cgmath::Vector3<_> = self.light_uniform.position.into();
+            self.light_uniform.position = (cgmath::Quaternion::from_axis_angle(
+                cgmath::Vector3::unit_y(),
+                cgmath::Rad(time_delta_ms as f32 / 1000.0 * std::f32::consts::TAU),
+            ) * old_position)
+                .into();
+            self.queue.write_buffer(
+                &self.light_buffer,
+                0,
+                bytemuck::cast_slice(&[self.light_uniform]),
+            );
+        }
+
+        self.instances.update(&self.device, self.update_time_ms);
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
@@ -350,15 +414,21 @@ impl State {
                 timestamp_writes: None,
             });
 
-            render_pass.set_pipeline(self.render_pipelines.get(self.is_challenge));
-
-            // let shape = self.shapes.get(self.is_challenge);
             render_pass.set_vertex_buffer(1, self.instances.instance_buffer.slice(..));
 
+            render_pass.set_pipeline(self.render_pipelines.light());
+            render_pass.draw_light_model(
+                &self.obj_model,
+                &self.camera_bind_group,
+                &self.light_bind_group,
+            );
+
+            render_pass.set_pipeline(self.render_pipelines.main(self.is_challenge));
             render_pass.draw_model_instanced(
                 &self.obj_model,
                 0..self.instances.len() as u32,
                 &self.camera_bind_group,
+                &self.light_bind_group,
             );
         }
 
@@ -382,48 +452,85 @@ impl State {
 }
 
 pub struct RenderPipelines {
-    normal: wgpu::RenderPipeline,
+    main_normal: wgpu::RenderPipeline,
+
+    light: wgpu::RenderPipeline,
 }
 
 impl RenderPipelines {
     pub fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
-        bind_group_layouts: &[&wgpu::BindGroupLayout],
-        shader: &wgpu::ShaderModule,
+        texture_bind_group_layout: &wgpu::BindGroupLayout,
+        camera_bind_group_layout: &wgpu::BindGroupLayout,
+        light_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
+        let main_normal_pipeline = {
+            let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Render Pipeline Layout"),
+                bind_group_layouts: &[
+                    texture_bind_group_layout,
+                    camera_bind_group_layout,
+                    light_bind_group_layout,
+                ],
+                push_constant_ranges: &[],
+            });
+            Self::new_pipeline(
+                device,
+                &layout,
+                config.format,
+                Some(textures::Texture::DEPTH_FORMAT),
+                &[ModelVertex::desc(), InstanceRaw::desc()],
+                &shader,
+            )
+        };
+
+        let light_pipeline = {
+            let shader = device.create_shader_module(wgpu::include_wgsl!("light.wgsl"));
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Light Pipeline Layout"),
+                bind_group_layouts: &[camera_bind_group_layout, light_bind_group_layout],
+                push_constant_ranges: &[],
+            });
+            Self::new_pipeline(
+                device,
+                &layout,
+                config.format,
+                Some(textures::Texture::DEPTH_FORMAT),
+                &[ModelVertex::desc()],
+                &shader,
+            )
+        };
+
         Self {
-            normal: Self::new_pipeline(device, config, shader, bind_group_layouts),
+            main_normal: main_normal_pipeline,
+            light: light_pipeline,
         }
     }
 
-    fn new_pipeline(
+    pub fn new_pipeline(
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
+        layout: &wgpu::PipelineLayout,
+        color_format: wgpu::TextureFormat,
+        depth_format: Option<wgpu::TextureFormat>,
+        vertex_layouts: &[wgpu::VertexBufferLayout],
         shader: &wgpu::ShaderModule,
-        bind_group_layouts: &[&wgpu::BindGroupLayout],
     ) -> wgpu::RenderPipeline {
-        let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
-                bind_group_layouts,
-                push_constant_ranges: &[],
-            });
-
         device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Render Pipeline"),
-            layout: Some(&render_pipeline_layout),
+            layout: Some(&layout),
             vertex: wgpu::VertexState {
                 module: shader,
                 entry_point: Some("vs_main"),
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: &[ModelVertex::desc(), InstanceRaw::desc()],
+                buffers: vertex_layouts,
             },
             fragment: Some(wgpu::FragmentState {
                 module: shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
+                    format: color_format,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -438,8 +545,8 @@ impl RenderPipelines {
                 polygon_mode: wgpu::PolygonMode::Fill,
                 conservative: false,
             },
-            depth_stencil: Some(wgpu::DepthStencilState {
-                format: textures::Texture::DEPTH_FORMAT,
+            depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {
+                format,
                 depth_write_enabled: true,
                 depth_compare: wgpu::CompareFunction::Less,
                 stencil: wgpu::StencilState::default(),
@@ -459,8 +566,12 @@ impl RenderPipelines {
         })
     }
 
-    pub fn get(&self, _is_challenge: bool) -> &wgpu::RenderPipeline {
-        &self.normal
+    pub fn main(&self, _is_challenge: bool) -> &wgpu::RenderPipeline {
+        &self.main_normal
+    }
+
+    pub fn light(&self) -> &wgpu::RenderPipeline {
+        &self.light
     }
 }
 
@@ -730,4 +841,14 @@ impl ApplicationHandler<State> for App {
             _ => {}
         }
     }
+}
+
+// lib.rs
+#[repr(C)]
+#[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+struct LightUniform {
+    position: [f32; 3],
+    _padding: u32,
+    color: [f32; 3],
+    _padding2: u32,
 }
