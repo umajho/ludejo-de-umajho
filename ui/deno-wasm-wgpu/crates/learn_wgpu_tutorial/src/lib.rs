@@ -599,6 +599,7 @@ impl CameraUniform {
 struct Instance {
     position: cgmath::Vector3<f32>,
     rotation: cgmath::Quaternion<f32>,
+    scale: cgmath::Vector3<f32>,
 }
 
 #[repr(C)]
@@ -606,6 +607,7 @@ struct Instance {
 struct InstanceRaw {
     model: [[f32; 4]; 4],
     normal: [[f32; 3]; 3],
+    scale: [f32; 3],
 }
 
 impl From<&Instance> for InstanceRaw {
@@ -615,12 +617,13 @@ impl From<&Instance> for InstanceRaw {
                 * cgmath::Matrix4::from(value.rotation))
             .into(),
             normal: cgmath::Matrix3::from(value.rotation).into(),
+            scale: value.scale.into(),
         }
     }
 }
 
 impl InstanceRaw {
-    const ATTRIBUTES: [wgpu::VertexAttribute; 7] = wgpu::vertex_attr_array![
+    const ATTRIBUTES: [wgpu::VertexAttribute; 8] = wgpu::vertex_attr_array![
         5 => Float32x4,
         6 => Float32x4,
         7 => Float32x4,
@@ -628,6 +631,7 @@ impl InstanceRaw {
         9 => Float32x3,
         10 => Float32x3,
         11 => Float32x3,
+        12 => Float32x3,
     ];
 
     const fn desc() -> wgpu::VertexBufferLayout<'static> {
@@ -648,7 +652,11 @@ struct Instances {
 }
 
 impl Instances {
+    const SCALE: f32 = 1.0;
+
     fn new(device: &wgpu::Device, instances_per_row: usize) -> Self {
+        let scale = cgmath::Vector3::new(1.0, 1.0, 1.0) * Self::SCALE;
+
         let instance_displacement = cgmath::Vector3::new(
             instances_per_row as f32 * 0.5,
             0.0,
@@ -663,6 +671,7 @@ impl Instances {
                         cgmath::Vector3::unit_z(),
                         cgmath::Deg(0.0),
                     ),
+                    scale,
                 })
             })
             .collect::<Vec<_>>();

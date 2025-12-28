@@ -21,6 +21,8 @@ struct InstanceInput {
   @location(9) normal_matrix_0: vec3<f32>,
   @location(10) normal_matrix_1: vec3<f32>,
   @location(11) normal_matrix_2: vec3<f32>,
+
+  @location(12) scale: vec3<f32>,
 }
 
 struct VertexInput {
@@ -59,7 +61,8 @@ fn vs_main(
 
   out.world_normal = normal_matrix * model.normal;
 
-  var world_position: vec4<f32> = model_matrix * vec4<f32>(model.position, 1.0);
+  let scaled_position = model.position * instance.scale;
+  var world_position: vec4<f32> = model_matrix * vec4<f32>(scaled_position, 1.0);
   out.world_position = world_position.xyz;
 
   out.clip_position = camera.view_proj * world_position;
