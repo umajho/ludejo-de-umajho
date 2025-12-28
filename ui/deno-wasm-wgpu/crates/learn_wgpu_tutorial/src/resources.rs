@@ -49,7 +49,6 @@ impl<T: rust_embed::RustEmbed> ResLoader for EmbedResLoader<T> {
     }
 
     fn load_binary(&self, filename: &str) -> anyhow::Result<Vec<u8>> {
-        log::info!("{:?}", T::iter().map(|n| n.to_string()).collect::<Vec<_>>());
         let file = T::get(&normalize_filename(filename))
             .ok_or_else(|| anyhow::anyhow!("Resource not found: #{}/{}", self.name, filename))?;
         Ok(file.data.into_owned())

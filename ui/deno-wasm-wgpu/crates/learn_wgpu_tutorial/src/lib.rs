@@ -52,7 +52,6 @@ pub fn run() -> anyhow::Result<()> {
 #[wasm_bindgen(start)]
 pub fn run_web() -> Result<(), wasm_bindgen::JsValue> {
     console_error_panic_hook::set_once();
-    log::info!("111");
     run().unwrap_throw();
 
     Ok(())
