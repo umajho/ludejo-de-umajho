@@ -7,6 +7,7 @@ mod resources;
 mod textures;
 mod utils;
 
+use std::ops::Range;
 use std::sync::Arc;
 
 #[cfg(target_arch = "wasm32")]
@@ -652,10 +653,10 @@ struct Instances {
 }
 
 impl Instances {
-    const SCALE: f32 = 1.0;
+    const GLOBAL_SCALE_CONTROL: f32 = 0.8;
 
     fn new(device: &wgpu::Device, instances_per_row: usize) -> Self {
-        let scale = cgmath::Vector3::new(1.0, 1.0, 1.0) * Self::SCALE;
+        let scale = cgmath::Vector3::new(1.0, 1.0, 1.0);
 
         let instance_displacement = cgmath::Vector3::new(
             instances_per_row as f32 * 0.5,
@@ -693,12 +694,16 @@ impl Instances {
         self.instances.len()
     }
 
-    const AMPLITUDE: f32 = 0.5;
+    const TRANSLATE_Y_AMPLITUDE: f32 = 0.5;
+    const SCALE_AMPLITUDE_RANGE: Range<f32> = 0.6..1.2;
 
     fn update(&mut self, device: &wgpu::Device, now_ms: u64) {
         const SPACE_BETWEEN: f32 = 3.0;
 
-        let progress = (now_ms % 1000) as f32 / 1000.0;
+        let progress_1 = (now_ms % 2000) as f32 / 2000.0;
+        let progress_2 = (now_ms % 3000) as f32 / 3000.0;
+        let progress_3 = (now_ms % 5000) as f32 / 5000.0;
+        let progress_4 = (now_ms % 7000) as f32 / 7000.0;
         // let progress = 0.0;
 
         for i in 0..self.instances_per_row {
@@ -707,23 +712,36 @@ impl Instances {
                 let z = SPACE_BETWEEN * (j as f32 - self.instances_per_row as f32 / 2.0);
 
                 let local_progress = (i as f32 * self.instances_per_row as f32 + j as f32)
-                    / (self.instances_per_row * self.instances_per_row) as f32
-                    + progress;
+                    / (self.instances_per_row * self.instances_per_row) as f32;
+                let final_progress_1 = progress_1 + local_progress;
+                let final_progress_2 = progress_2 + local_progress;
+                let final_progress_3 = progress_3 + local_progress;
+                let final_progress_4 = progress_4 + local_progress;
 
                 let instance = &mut self.instances[i * self.instances_per_row + j];
 
                 let position = cgmath::Vector3 {
                     x,
-                    y: Self::AMPLITUDE * (local_progress * std::f32::consts::TAU).sin(),
+                    y: Self::TRANSLATE_Y_AMPLITUDE
+                        * (final_progress_1 * std::f32::consts::TAU).sin(),
                     z,
                 } - self.instance_displacement;
                 let rotation = cgmath::Quaternion::from_axis_angle(
-                    (cgmath::Vector3::unit_y() + cgmath::Vector3::unit_x()).normalize(),
-                    cgmath::Rad(local_progress * std::f32::consts::TAU),
+                    cgmath::Vector3::unit_y(),
+                    cgmath::Rad(final_progress_2 * std::f32::consts::TAU),
+                ) * cgmath::Quaternion::from_axis_angle(
+                    cgmath::Vector3::unit_x(),
+                    cgmath::Rad(final_progress_3 * std::f32::consts::TAU),
                 );
+
+                let scale = Self::SCALE_AMPLITUDE_RANGE.start
+                    + (Self::SCALE_AMPLITUDE_RANGE.end - Self::SCALE_AMPLITUDE_RANGE.start)
+                        * (final_progress_4 * std::f32::consts::TAU).sin().abs();
 
                 instance.position = position;
                 instance.rotation = rotation;
+                instance.scale =
+                    cgmath::Vector3::new(scale, scale, scale) * Self::GLOBAL_SCALE_CONTROL;
             }
         }
 
