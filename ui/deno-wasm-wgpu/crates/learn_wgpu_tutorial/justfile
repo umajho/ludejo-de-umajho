@@ -3,3 +3,9 @@ web-build:
 
 web-serve:
   python3 -m http.server 3333 --directory .
+
+native-dev:
+  MTL_HUD_ENABLED=1 cargo run
+
+native-run:
+  MTL_HUD_ENABLED=1 cargo run --release
