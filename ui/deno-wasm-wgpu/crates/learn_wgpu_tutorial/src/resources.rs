@@ -279,27 +279,16 @@ impl<T: ResLoader> ModelLoader for PmxLoader<T> {
                 queue,
             )?;
             let size = diffuse_texture.texture.size();
-            let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-                layout,
-                entries: &[
-                    wgpu::BindGroupEntry {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&diffuse_texture.view),
-                    },
-                    wgpu::BindGroupEntry {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&diffuse_texture.sampler),
-                    },
-                ],
-                label: None,
-            });
 
-            materials.push(Material {
-                name: m.local_name.clone(),
+            let normal_texture = new_flat_normal_texture(device, queue, size.width, size.height);
+
+            materials.push(Material::new(
+                device,
+                &m.local_name,
                 diffuse_texture,
-                normal_texture: new_flat_normal_texture(device, queue, size.width, size.height),
-                bind_group,
-            });
+                normal_texture,
+                layout,
+            ));
 
             let mut global_to_local_vertex_index_map = std::collections::HashMap::new();
             let mut vertices = Vec::new();
