@@ -1,6 +1,7 @@
 #![feature(cfg_select)]
 #![feature(decl_macro)]
 
+mod camera;
 mod copied;
 mod models;
 mod resources;
@@ -16,6 +17,7 @@ use wasm_bindgen::prelude::*;
 use cgmath::prelude::*;
 
 use wgpu::util::DeviceExt;
+use winit::event::{DeviceEvent, ElementState, MouseButton};
 use winit::event_loop::EventLoop;
 use winit::{
     application::ApplicationHandler,
@@ -57,37 +59,6 @@ pub fn run_web() -> Result<(), wasm_bindgen::JsValue> {
     Ok(())
 }
 
-struct Camera {
-    eye: cgmath::Point3<f32>,
-    target: cgmath::Point3<f32>,
-    up: cgmath::Vector3<f32>,
-    aspect: f32,
-    fovy: f32,
-    znear: f32,
-    zfar: f32,
-}
-
-impl Camera {
-    fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
-        let view = cgmath::Matrix4::look_at_rh(self.eye, self.target, self.up);
-        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-
-        OPENGL_TO_WGPU_MATRIX * proj * view
-    }
-
-    fn update_aspect(&mut self, width: u32, height: u32) {
-        self.aspect = width as f32 / height as f32;
-    }
-}
-
-#[rustfmt::skip]
-pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::from_cols(
-    cgmath::Vector4::new(1.0, 0.0, 0.0, 0.0),
-    cgmath::Vector4::new(0.0, 1.0, 0.0, 0.0),
-    cgmath::Vector4::new(0.0, 0.0, 0.5, 0.0),
-    cgmath::Vector4::new(0.0, 0.0, 0.5, 1.0),
-);
-
 pub struct State {
     surface: wgpu::Surface<'static>,
     device: wgpu::Device,
@@ -96,16 +67,19 @@ pub struct State {
     is_surface_configured: bool,
     render_pipelines: RenderPipelines,
     obj_model: Model,
-    camera: Camera,
+    camera: camera::Camera,
+    projection: camera::Projection,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
-    camera_control: copied::CameraController,
+    camera_controller: camera::CameraController,
     camera_bind_group: wgpu::BindGroup,
     light_uniform: LightUniform,
     light_buffer: wgpu::Buffer,
     light_bind_group: wgpu::BindGroup,
     depth_pass: copied::DepthPass,
     instances: Instances,
+
+    mouse_pressed: bool,
 
     window: Arc<Window>,
 
@@ -202,18 +176,13 @@ impl State {
                 label: Some("texture_bind_group_layout"),
             });
 
-        let camera = Camera {
-            eye: (0.0, 1.0, 2.0).into(),
-            target: (0.0, 0.0, 0.0).into(),
-            up: cgmath::Vector3::unit_y(),
-            aspect: config.width as f32 / config.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-        };
+        let camera = camera::Camera::new((0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
+        let projection =
+            camera::Projection::new(config.width, config.height, cgmath::Deg(45.0), 0.1, 100.0);
+        let camera_controller = camera::CameraController::new(4.0, 0.4);
 
         let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update_view_proj(&camera);
+        camera_uniform.update_view_proj(&camera, &projection);
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
@@ -243,8 +212,6 @@ impl State {
             }],
             label: Some("camera_bind_group"),
         });
-
-        let camera_control = copied::CameraController::new(0.2);
 
         let light_uniform = LightUniform {
             position: [2.0, 2.0, 2.0],
@@ -322,15 +289,18 @@ impl State {
             render_pipelines,
             obj_model,
             camera,
+            projection,
             camera_uniform,
             camera_buffer,
             camera_bind_group,
-            camera_control,
+            camera_controller,
             light_uniform,
             light_buffer,
             light_bind_group,
             depth_pass,
             instances,
+
+            mouse_pressed: false,
 
             update_time_ms: utils::now_ms(),
 
@@ -347,7 +317,7 @@ impl State {
             self.surface.configure(&self.device, &self.config);
             self.is_surface_configured = true;
 
-            self.camera.update_aspect(width, height);
+            self.projection.resize(width, height);
 
             self.depth_pass.resize(&self.device, &self.config);
         }
@@ -357,8 +327,10 @@ impl State {
         let last_update_time_ms = core::mem::replace(&mut self.update_time_ms, utils::now_ms());
         let time_delta_ms = self.update_time_ms - last_update_time_ms;
 
-        self.camera_control.update_camera(&mut self.camera);
-        self.camera_uniform.update_view_proj(&self.camera);
+        self.camera_controller
+            .update_camera(&mut self.camera, time_delta_ms as f32 / 1000.0);
+        self.camera_uniform
+            .update_view_proj(&self.camera, &self.projection);
         self.queue.write_buffer(
             &self.camera_buffer,
             0,
@@ -456,13 +428,30 @@ impl State {
         Ok(())
     }
 
-    pub fn handle_key(&mut self, event_loop: &ActiveEventLoop, code: KeyCode, is_prossed: bool) {
-        match (code, is_prossed) {
-            (KeyCode::Escape, true) => event_loop.exit(),
-            (KeyCode::Space, true) => self.is_challenge = !self.is_challenge,
-            (code, is_pressed) => {
-                self.camera_control.handle_key(code, is_pressed);
+    fn input(&mut self, event: &WindowEvent) -> bool {
+        match event {
+            WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(key),
+                        state,
+                        ..
+                    },
+                ..
+            } => self.camera_controller.process_keyboard(*key, *state),
+            WindowEvent::MouseWheel { delta, .. } => {
+                self.camera_controller.handle_mouse_scroll(delta);
+                true
             }
+            WindowEvent::MouseInput {
+                button: MouseButton::Left,
+                state,
+                ..
+            } => {
+                self.mouse_pressed = *state == ElementState::Pressed;
+                true
+            }
+            _ => false,
         }
     }
 }
@@ -606,9 +595,9 @@ impl CameraUniform {
         }
     }
 
-    fn update_view_proj(&mut self, camera: &Camera) {
-        self.view_position = camera.eye.to_homogeneous().into();
-        self.view_proj = camera.build_view_projection_matrix().into();
+    fn update_view_proj(&mut self, camera: &camera::Camera, projection: &camera::Projection) {
+        self.view_position = camera.position.to_homogeneous().into();
+        self.view_proj = (projection.calc_matrix() * camera.calc_matrix()).into();
     }
 }
 
@@ -850,11 +839,11 @@ impl ApplicationHandler<State> for App {
         self.state = Some(event);
     }
 
-    fn window_event(
+    fn device_event(
         &mut self,
-        event_loop: &ActiveEventLoop,
-        _window_id: winit::window::WindowId,
-        event: WindowEvent,
+        _event_loop: &ActiveEventLoop,
+        _device_id: winit::event::DeviceId,
+        event: winit::event::DeviceEvent,
     ) {
         let state = match &mut self.state {
             Some(state) => state,
@@ -862,7 +851,45 @@ impl ApplicationHandler<State> for App {
         };
 
         match event {
-            WindowEvent::CloseRequested => {
+            DeviceEvent::MouseMotion { delta } => {
+                if state.mouse_pressed {
+                    state.camera_controller.handle_mouse(delta.0, delta.1);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    fn window_event(
+        &mut self,
+        event_loop: &ActiveEventLoop,
+        window_id: winit::window::WindowId,
+        event: WindowEvent,
+    ) {
+        let state = match &mut self.state {
+            Some(state) => state,
+            None => return,
+        };
+
+        if window_id != state.window.id() {
+            return;
+        }
+
+        if state.input(&event) {
+            return;
+        }
+
+        match event {
+            WindowEvent::CloseRequested
+            | WindowEvent::KeyboardInput {
+                event:
+                    KeyEvent {
+                        physical_key: PhysicalKey::Code(KeyCode::Escape),
+                        state: ElementState::Pressed,
+                        ..
+                    },
+                ..
+            } => {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => state.resize(size.width, size.height),
@@ -880,15 +907,6 @@ impl ApplicationHandler<State> for App {
                     }
                 }
             }
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        physical_key: PhysicalKey::Code(code),
-                        state: key_state,
-                        ..
-                    },
-                ..
-            } => state.handle_key(event_loop, code, key_state.is_pressed()),
             _ => {}
         }
     }
