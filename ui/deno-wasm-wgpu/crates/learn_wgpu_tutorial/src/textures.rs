@@ -48,7 +48,7 @@ impl Texture {
             format,
             usage: wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
             label,
-            view_formats: &[],
+            view_formats: &[format.add_srgb_suffix()],
         });
 
         queue.write_texture(

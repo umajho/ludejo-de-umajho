@@ -133,7 +133,7 @@ impl State {
             present_mode: surface_caps.present_modes[0],
             // present_mode: wgpu::PresentMode::AutoNoVsync,
             alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![],
+            view_formats: vec![surface_format.add_srgb_suffix()],
             desired_maximum_frame_latency: 2,
         };
 
@@ -363,9 +363,10 @@ impl State {
 
         let output = self.surface.get_current_texture()?;
 
-        let view = output
-            .texture
-            .create_view(&wgpu::TextureViewDescriptor::default());
+        let view = output.texture.create_view(&wgpu::TextureViewDescriptor {
+            format: Some(self.config.format.add_srgb_suffix()),
+            ..Default::default()
+        });
 
         let mut encoder = self
             .device
@@ -535,7 +536,7 @@ impl RenderPipelines {
                 module: shader,
                 entry_point: Some("fs_main"),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: color_format,
+                    format: color_format.add_srgb_suffix(),
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
