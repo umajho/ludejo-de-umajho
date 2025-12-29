@@ -3,6 +3,7 @@
 
 mod camera;
 mod copied;
+mod hdr_tonemapping;
 mod models;
 mod resources;
 mod textures;
@@ -66,6 +67,7 @@ pub struct State {
     config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
     render_pipelines: RenderPipelines,
+    hdr: hdr_tonemapping::HdrPipeline,
     obj_model: Model,
     camera: camera::Camera,
     projection: camera::Projection,
@@ -249,9 +251,11 @@ impl State {
             label: None,
         });
 
+        let hdr = hdr_tonemapping::HdrPipeline::new(&device, &config);
+
         let render_pipelines = RenderPipelines::new(
             &device,
-            &config,
+            &hdr,
             &texture_bind_group_layout,
             &camera_bind_group_layout,
             &light_bind_group_layout,
@@ -287,6 +291,7 @@ impl State {
             config,
             is_surface_configured: false,
             render_pipelines,
+            hdr,
             obj_model,
             camera,
             projection,
@@ -320,6 +325,8 @@ impl State {
             self.projection.resize(width, height);
 
             self.depth_pass.resize(&self.device, &self.config);
+
+            self.hdr.resize(&self.device, width, height);
         }
     }
 
@@ -378,7 +385,7 @@ impl State {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("Render Pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: &view,
+                    view: self.hdr.view(),
                     depth_slice: None,
                     resolve_target: None,
                     ops: wgpu::Operations {
@@ -420,6 +427,8 @@ impl State {
                 &self.light_bind_group,
             );
         }
+
+        self.hdr.process(&mut encoder, &view);
 
         // self.depth_pass.render(&view, &mut encoder);
 
@@ -466,7 +475,7 @@ pub struct RenderPipelines {
 impl RenderPipelines {
     pub fn new(
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
+        hdr: &hdr_tonemapping::HdrPipeline,
         texture_bind_group_layout: &wgpu::BindGroupLayout,
         camera_bind_group_layout: &wgpu::BindGroupLayout,
         light_bind_group_layout: &wgpu::BindGroupLayout,
@@ -482,12 +491,14 @@ impl RenderPipelines {
                 ],
                 push_constant_ranges: &[],
             });
-            Self::new_pipeline(
+            new_render_pipeline(
+                "main",
                 device,
                 &layout,
-                config.format,
+                hdr.format(),
                 Some(textures::Texture::DEPTH_FORMAT),
                 &[ModelVertex::desc(), InstanceRaw::desc()],
+                wgpu::PrimitiveTopology::TriangleList,
                 &shader,
             )
         };
@@ -499,12 +510,14 @@ impl RenderPipelines {
                 bind_group_layouts: &[camera_bind_group_layout, light_bind_group_layout],
                 push_constant_ranges: &[],
             });
-            Self::new_pipeline(
+            new_render_pipeline(
+                "light",
                 device,
                 &layout,
-                config.format,
+                hdr.format(),
                 Some(textures::Texture::DEPTH_FORMAT),
                 &[ModelVertex::desc()],
+                wgpu::PrimitiveTopology::TriangleList,
                 &shader,
             )
         };
@@ -515,63 +528,6 @@ impl RenderPipelines {
         }
     }
 
-    pub fn new_pipeline(
-        device: &wgpu::Device,
-        layout: &wgpu::PipelineLayout,
-        color_format: wgpu::TextureFormat,
-        depth_format: Option<wgpu::TextureFormat>,
-        vertex_layouts: &[wgpu::VertexBufferLayout],
-        shader: &wgpu::ShaderModule,
-    ) -> wgpu::RenderPipeline {
-        device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Render Pipeline"),
-            layout: Some(&layout),
-            vertex: wgpu::VertexState {
-                module: shader,
-                entry_point: Some("vs_main"),
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-                buffers: vertex_layouts,
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: shader,
-                entry_point: Some("fs_main"),
-                targets: &[Some(wgpu::ColorTargetState {
-                    format: color_format.add_srgb_suffix(),
-                    blend: Some(wgpu::BlendState::REPLACE),
-                    write_mask: wgpu::ColorWrites::ALL,
-                })],
-                compilation_options: wgpu::PipelineCompilationOptions::default(),
-            }),
-            primitive: wgpu::PrimitiveState {
-                topology: wgpu::PrimitiveTopology::TriangleList,
-                strip_index_format: None,
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: Some(wgpu::Face::Back),
-                unclipped_depth: false,
-                polygon_mode: wgpu::PolygonMode::Fill,
-                conservative: false,
-            },
-            depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {
-                format,
-                depth_write_enabled: true,
-                depth_compare: wgpu::CompareFunction::Less,
-                stencil: wgpu::StencilState::default(),
-                bias: wgpu::DepthBiasState {
-                    constant: 2, // Corresponds to bilinear filtering
-                    slope_scale: 2.0,
-                    clamp: 0.0,
-                },
-            }),
-            multisample: wgpu::MultisampleState {
-                count: 1,
-                mask: !0,
-                alpha_to_coverage_enabled: false,
-            },
-            multiview: None,
-            cache: None,
-        })
-    }
-
     pub fn main(&self, _is_challenge: bool) -> &wgpu::RenderPipeline {
         &self.main_regular
     }
@@ -579,6 +535,65 @@ impl RenderPipelines {
     pub fn light(&self) -> &wgpu::RenderPipeline {
         &self.light
     }
+}
+
+pub fn new_render_pipeline(
+    name: &str,
+    device: &wgpu::Device,
+    layout: &wgpu::PipelineLayout,
+    color_format: wgpu::TextureFormat,
+    depth_format: Option<wgpu::TextureFormat>,
+    vertex_layouts: &[wgpu::VertexBufferLayout],
+    topology: wgpu::PrimitiveTopology,
+    shader: &wgpu::ShaderModule,
+) -> wgpu::RenderPipeline {
+    device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        label: Some(format!("Render Pipeline: {}", name).as_str()),
+        layout: Some(&layout),
+        vertex: wgpu::VertexState {
+            module: shader,
+            entry_point: Some("vs_main"),
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+            buffers: vertex_layouts,
+        },
+        fragment: Some(wgpu::FragmentState {
+            module: shader,
+            entry_point: Some("fs_main"),
+            targets: &[Some(wgpu::ColorTargetState {
+                format: color_format.add_srgb_suffix(),
+                blend: Some(wgpu::BlendState::REPLACE),
+                write_mask: wgpu::ColorWrites::ALL,
+            })],
+            compilation_options: wgpu::PipelineCompilationOptions::default(),
+        }),
+        primitive: wgpu::PrimitiveState {
+            topology,
+            strip_index_format: None,
+            front_face: wgpu::FrontFace::Ccw,
+            cull_mode: Some(wgpu::Face::Back),
+            unclipped_depth: false,
+            polygon_mode: wgpu::PolygonMode::Fill,
+            conservative: false,
+        },
+        depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {
+            format,
+            depth_write_enabled: true,
+            depth_compare: wgpu::CompareFunction::Less,
+            stencil: wgpu::StencilState::default(),
+            bias: wgpu::DepthBiasState {
+                constant: 2, // Corresponds to bilinear filtering
+                slope_scale: 2.0,
+                clamp: 0.0,
+            },
+        }),
+        multisample: wgpu::MultisampleState {
+            count: 1,
+            mask: !0,
+            alpha_to_coverage_enabled: false,
+        },
+        multiview: None,
+        cache: None,
+    })
 }
 
 #[repr(C)]
