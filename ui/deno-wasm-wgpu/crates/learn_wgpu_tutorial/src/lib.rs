@@ -29,7 +29,7 @@ use winit::{
 };
 
 use crate::models::{DrawModel, Model, ModelVertex, Vertex};
-use crate::resources::ModelLoader;
+use crate::resources::{ModelLoader, ResLoader};
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
@@ -68,6 +68,8 @@ pub struct State {
     is_surface_configured: bool,
     render_pipelines: RenderPipelines,
     hdr: hdr_tonemapping::HdrPipeline,
+    environment_bind_group: wgpu::BindGroup,
+    sky_pipeline: wgpu::RenderPipeline,
     obj_model: Model,
     camera: camera::Camera,
     projection: camera::Projection,
@@ -253,12 +255,80 @@ impl State {
 
         let hdr = hdr_tonemapping::HdrPipeline::new(&device, &config);
 
+        let sky_res_loader = resources::EmbedResLoader::<resources::ResSky>::new("sky");
+        let sky_bytes = sky_res_loader.load_binary("pure-sky.hdr")?;
+        let hdr_loader = resources::HdrLoader::new(&device);
+        let sky_texture = hdr_loader.from_equirectangular_bytes(
+            &device,
+            &queue,
+            &sky_bytes,
+            1080,
+            Some("Sky Texture"),
+        )?;
+
+        let environment_layout =
+            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("environment_layout"),
+                entries: &[
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 0,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Texture {
+                            sample_type: wgpu::TextureSampleType::Float { filterable: false },
+                            view_dimension: wgpu::TextureViewDimension::Cube,
+                            multisampled: false,
+                        },
+                        count: None,
+                    },
+                    wgpu::BindGroupLayoutEntry {
+                        binding: 1,
+                        visibility: wgpu::ShaderStages::FRAGMENT,
+                        ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::NonFiltering),
+                        count: None,
+                    },
+                ],
+            });
+        let environment_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("environment_bind_group"),
+            layout: &environment_layout,
+            entries: &[
+                wgpu::BindGroupEntry {
+                    binding: 0,
+                    resource: wgpu::BindingResource::TextureView(&sky_texture.view()),
+                },
+                wgpu::BindGroupEntry {
+                    binding: 1,
+                    resource: wgpu::BindingResource::Sampler(&sky_texture.sampler()),
+                },
+            ],
+        });
+
+        let sky_pipeline = {
+            let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Sky Pipeline Layout"),
+                bind_group_layouts: &[&camera_bind_group_layout, &environment_layout],
+                push_constant_ranges: &[],
+            });
+            let shader = wgpu::include_wgsl!("sky.wgsl");
+            new_render_pipeline(
+                "sky",
+                &device,
+                &layout,
+                hdr.format(),
+                Some(textures::Texture::DEPTH_FORMAT),
+                &[],
+                wgpu::PrimitiveTopology::TriangleList,
+                &device.create_shader_module(shader),
+            )
+        };
+
         let render_pipelines = RenderPipelines::new(
             &device,
             &hdr,
             &texture_bind_group_layout,
             &camera_bind_group_layout,
             &light_bind_group_layout,
+            &environment_layout,
         );
 
         let depth_pass = copied::DepthPass::new(
@@ -292,6 +362,8 @@ impl State {
             is_surface_configured: false,
             render_pipelines,
             hdr,
+            environment_bind_group,
+            sky_pipeline,
             obj_model,
             camera,
             projection,
@@ -425,7 +497,13 @@ impl State {
                 0..self.instances.len() as u32,
                 &self.camera_bind_group,
                 &self.light_bind_group,
+                &self.environment_bind_group,
             );
+
+            render_pass.set_pipeline(&self.sky_pipeline);
+            render_pass.set_bind_group(0, &self.camera_bind_group, &[]);
+            render_pass.set_bind_group(1, &self.environment_bind_group, &[]);
+            render_pass.draw(0..3, 0..1);
         }
 
         self.hdr.process(&mut encoder, &view);
@@ -479,6 +557,7 @@ impl RenderPipelines {
         texture_bind_group_layout: &wgpu::BindGroupLayout,
         camera_bind_group_layout: &wgpu::BindGroupLayout,
         light_bind_group_layout: &wgpu::BindGroupLayout,
+        environment_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let main_regular_pipeline = {
             let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
@@ -488,6 +567,7 @@ impl RenderPipelines {
                     texture_bind_group_layout,
                     camera_bind_group_layout,
                     light_bind_group_layout,
+                    environment_bind_group_layout,
                 ],
                 push_constant_ranges: &[],
             });
@@ -578,7 +658,7 @@ pub fn new_render_pipeline(
         depth_stencil: depth_format.map(|format| wgpu::DepthStencilState {
             format,
             depth_write_enabled: true,
-            depth_compare: wgpu::CompareFunction::Less,
+            depth_compare: wgpu::CompareFunction::LessEqual,
             stencil: wgpu::StencilState::default(),
             bias: wgpu::DepthBiasState {
                 constant: 2, // Corresponds to bilinear filtering
@@ -600,20 +680,32 @@ pub fn new_render_pipeline(
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
     view_position: [f32; 4],
+    view: [[f32; 4]; 4],
     view_proj: [[f32; 4]; 4],
+    inv_proj: [[f32; 4]; 4],
+    inv_view: [[f32; 4]; 4],
 }
 
 impl CameraUniform {
     fn new() -> Self {
         Self {
             view_position: [0.0; 4],
+            view: cgmath::Matrix4::identity().into(),
             view_proj: cgmath::Matrix4::identity().into(),
+            inv_proj: cgmath::Matrix4::identity().into(),
+            inv_view: cgmath::Matrix4::identity().into(),
         }
     }
 
     fn update_view_proj(&mut self, camera: &camera::Camera, projection: &camera::Projection) {
         self.view_position = camera.position.to_homogeneous().into();
-        self.view_proj = (projection.calc_matrix() * camera.calc_matrix()).into();
+        let proj = projection.calc_matrix();
+        let view = camera.calc_matrix();
+        let view_proj = proj * view;
+        self.view = view.into();
+        self.view_proj = view_proj.into();
+        self.inv_proj = proj.invert().unwrap().into();
+        self.inv_view = view.transpose().into();
     }
 }
 

@@ -8,9 +8,10 @@ anyhow = "1.0.100"
 bytemuck = { version = "1.24.0", features = ["derive"] }
 cgmath = "0.18.0"
 env_logger = "0.11.8"
-image = { version = "0.25.9", default-features = false, features = [
+image = { version = "0.24.9", default-features = false, features = [
   "png",
   "jpeg",
+  "hdr",
 ] }
 log = "0.4.29"
 # disabled vek because: https://github.com/yoanlcq/vek/issues/96
