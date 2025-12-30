@@ -6,6 +6,7 @@ mod copied;
 mod hdr_tonemapping;
 mod models;
 mod resources;
+mod shaders;
 mod textures;
 mod utils;
 
@@ -309,7 +310,6 @@ impl State {
                 bind_group_layouts: &[&camera_bind_group_layout, &environment_layout],
                 push_constant_ranges: &[],
             });
-            let shader = wgpu::include_wgsl!("sky.wgsl");
             new_render_pipeline(
                 "sky",
                 &device,
@@ -318,7 +318,7 @@ impl State {
                 Some(textures::Texture::DEPTH_FORMAT),
                 &[],
                 wgpu::PrimitiveTopology::TriangleList,
-                &device.create_shader_module(shader),
+                &shaders::r_sky(&device),
             )
         };
 
@@ -331,11 +331,7 @@ impl State {
             &environment_layout,
         );
 
-        let depth_pass = copied::DepthPass::new(
-            &device,
-            &config,
-            &device.create_shader_module(wgpu::include_wgsl!("depth.wgsl")),
-        );
+        let depth_pass = copied::DepthPass::new(&device, &config, &shaders::r_depth(&device));
 
         let obj_res_loader = resources::EmbedResLoader::<resources::ResCube>::new("cube");
         let obj_model_loader = resources::ObjLoader::new(obj_res_loader);
@@ -560,7 +556,6 @@ impl RenderPipelines {
         environment_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let main_regular_pipeline = {
-            let shader = device.create_shader_module(wgpu::include_wgsl!("shader.wgsl"));
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Render Pipeline Layout"),
                 bind_group_layouts: &[
@@ -579,12 +574,11 @@ impl RenderPipelines {
                 Some(textures::Texture::DEPTH_FORMAT),
                 &[ModelVertex::desc(), InstanceRaw::desc()],
                 wgpu::PrimitiveTopology::TriangleList,
-                &shader,
+                &shaders::r_main(device),
             )
         };
 
         let light_pipeline = {
-            let shader = device.create_shader_module(wgpu::include_wgsl!("light.wgsl"));
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 label: Some("Light Pipeline Layout"),
                 bind_group_layouts: &[camera_bind_group_layout, light_bind_group_layout],
@@ -598,7 +592,7 @@ impl RenderPipelines {
                 Some(textures::Texture::DEPTH_FORMAT),
                 &[ModelVertex::desc()],
                 wgpu::PrimitiveTopology::TriangleList,
-                &shader,
+                &shaders::r_light(device),
             )
         };
 
@@ -625,20 +619,16 @@ pub fn new_render_pipeline(
     depth_format: Option<wgpu::TextureFormat>,
     vertex_layouts: &[wgpu::VertexBufferLayout],
     topology: wgpu::PrimitiveTopology,
-    shader: &wgpu::ShaderModule,
+    shader: &shaders::RenderShader,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some(format!("Render Pipeline: {}", name).as_str()),
         layout: Some(&layout),
-        vertex: wgpu::VertexState {
-            module: shader,
-            entry_point: Some("vs_main"),
+        vertex: shader.vertex_state(shaders::VertexStatePartial {
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             buffers: vertex_layouts,
-        },
-        fragment: Some(wgpu::FragmentState {
-            module: shader,
-            entry_point: Some("fs_main"),
+        }),
+        fragment: shader.fragment_state(shaders::FragmentStatePartial {
             targets: &[Some(wgpu::ColorTargetState {
                 format: color_format.add_srgb_suffix(),
                 blend: Some(wgpu::BlendState::REPLACE),

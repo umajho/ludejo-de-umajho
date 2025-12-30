@@ -1,4 +1,4 @@
-use crate::{new_render_pipeline, textures};
+use crate::{new_render_pipeline, shaders, textures};
 
 pub struct HdrPipeline {
     pipeline: wgpu::RenderPipeline,
@@ -63,7 +63,6 @@ impl HdrPipeline {
             ],
         });
 
-        let shader = wgpu::include_wgsl!("hdr_tonemapping.wgsl");
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
             label: None,
             bind_group_layouts: &[&layout],
@@ -78,7 +77,7 @@ impl HdrPipeline {
             None,
             &[],
             wgpu::PrimitiveTopology::TriangleList,
-            &device.create_shader_module(shader),
+            &shaders::r_hdr_tonemapping(device),
         );
 
         Self {

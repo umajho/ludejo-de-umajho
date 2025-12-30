@@ -6,7 +6,7 @@ use wgpu::{ComputePassDescriptor, util::DeviceExt};
 
 use crate::{
     models::{Material, Mesh, Model, ModelVertex},
-    textures,
+    shaders, textures,
 };
 
 #[derive(Embed)]
@@ -434,7 +434,6 @@ pub struct HdrLoader {
 
 impl HdrLoader {
     pub fn new(device: &wgpu::Device) -> Self {
-        let module = device.create_shader_module(wgpu::include_wgsl!("equirectangular.wgsl"));
         let texture_format = wgpu::TextureFormat::Rgba32Float;
         let equirect_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("HdrLoader::equirect_layout"),
@@ -468,15 +467,16 @@ impl HdrLoader {
             push_constant_ranges: &[],
         });
 
-        let equirect_to_cubemap =
-            device.create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
-                label: Some("equirect_to_cube_map"),
-                layout: Some(&pipeline_layout),
-                module: &module,
-                entry_point: Some("compute_equirect_to_cubemap"),
-                compilation_options: Default::default(),
-                cache: None,
-            });
+        let equirect_to_cubemap = device.create_compute_pipeline(
+            &shaders::c_equirectangular(device).compute_pipeline_descriptor(
+                shaders::ComputePipelineDescriptorPartial {
+                    label: Some("equirect_to_cube_map"),
+                    layout: Some(&pipeline_layout),
+                    compilation_options: Default::default(),
+                    cache: None,
+                },
+            ),
+        );
 
         Self {
             texture_format,

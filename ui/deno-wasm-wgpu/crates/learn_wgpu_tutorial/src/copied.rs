@@ -1,6 +1,6 @@
 use wgpu::util::DeviceExt;
 
-use crate::{models::ShapeVertex, textures};
+use crate::{models::ShapeVertex, shaders, textures};
 
 // https://github.com/sotrh/learn-wgpu/blob/075f2a53b5112f3275aad1746104013e7316c80b/code/beginner/tutorial8-depth/src/challenge.rs#L278
 pub struct DepthPass {
@@ -38,7 +38,7 @@ impl DepthPass {
     pub fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
-        shader: &wgpu::ShaderModule,
+        shader: &shaders::RenderShader,
     ) -> Self {
         let texture = textures::Texture::create_depth_texture_non_comparison_sampler(
             device,
@@ -103,15 +103,11 @@ impl DepthPass {
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Depth Pass Render Pipeline"),
             layout: Some(&pipeline_layout),
-            vertex: wgpu::VertexState {
-                module: shader,
-                entry_point: Some("vs_main"),
+            vertex: shader.vertex_state(shaders::VertexStatePartial {
                 buffers: &[ShapeVertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
-            },
-            fragment: Some(wgpu::FragmentState {
-                module: shader,
-                entry_point: Some("fs_main"),
+            }),
+            fragment: shader.fragment_state(shaders::FragmentStatePartial {
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
                     blend: Some(wgpu::BlendState {

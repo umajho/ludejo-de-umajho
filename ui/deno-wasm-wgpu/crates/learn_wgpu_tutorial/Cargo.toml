@@ -20,6 +20,7 @@ pollster = "0.4.0"
 rust-embed = "8.9.0"
 tobj = { version = "4.0.3", default-features = false, features = ["async"] }
 trig-const = "0.3.0"
+wesl = "0.3.2"
 wgpu = "27.0.1"
 winit = { version = "0.30.12", features = ["android-native-activity"] }
 
@@ -32,3 +33,6 @@ web-sys = { version = "0.3.83", features = ["Document", "Window", "Element"] }
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[build-dependencies]
+wesl = "0.3.2"
