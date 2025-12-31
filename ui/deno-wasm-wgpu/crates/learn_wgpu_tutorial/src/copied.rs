@@ -16,20 +16,20 @@ pub struct DepthPass {
 impl DepthPass {
     const DEPTH_VERTICES: &[ShapeVertex] = &[
         ShapeVertex {
-            position: [0.0, 0.0, 0.0],
-            tex_coords: [0.0, 1.0],
+            position: glam::vec3(0.0, 0.0, 0.0),
+            tex_coords: glam::vec2(0.0, 1.0),
         },
         ShapeVertex {
-            position: [1.0, 0.0, 0.0],
-            tex_coords: [1.0, 1.0],
+            position: glam::vec3(1.0, 0.0, 0.0),
+            tex_coords: glam::vec2(1.0, 1.0),
         },
         ShapeVertex {
-            position: [1.0, 1.0, 0.0],
-            tex_coords: [1.0, 0.0],
+            position: glam::vec3(1.0, 1.0, 0.0),
+            tex_coords: glam::vec2(1.0, 0.0),
         },
         ShapeVertex {
-            position: [0.0, 1.0, 0.0],
-            tex_coords: [0.0, 0.0],
+            position: glam::vec3(0.0, 1.0, 0.0),
+            tex_coords: glam::vec2(0.0, 0.0),
         },
     ];
 

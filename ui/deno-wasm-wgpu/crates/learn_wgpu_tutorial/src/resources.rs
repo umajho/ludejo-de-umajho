@@ -1,5 +1,6 @@
 use std::io::{BufReader, Cursor};
 
+use glam::Vec3;
 use rust_embed::Embed;
 
 use wgpu::{ComputePassDescriptor, util::DeviceExt};
@@ -155,19 +156,22 @@ impl<T: ResLoader> ModelLoader for ObjLoader<T> {
                             m.mesh.positions[i * 3],
                             m.mesh.positions[i * 3 + 1],
                             m.mesh.positions[i * 3 + 2],
-                        ],
-                        tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]],
+                        ]
+                        .into(),
+                        tex_coords: [m.mesh.texcoords[i * 2], 1.0 - m.mesh.texcoords[i * 2 + 1]]
+                            .into(),
                         normal: if m.mesh.normals.is_empty() {
-                            [0.0, 0.0, 0.0]
+                            Vec3::ZERO
                         } else {
                             [
                                 m.mesh.normals[i * 3],
                                 m.mesh.normals[i * 3 + 1],
                                 m.mesh.normals[i * 3 + 2],
                             ]
+                            .into()
                         },
-                        tangent: [0.0; 3],
-                        bitangent: [0.0; 3],
+                        tangent: Vec3::ZERO,
+                        bitangent: Vec3::ZERO,
                     })
                     .collect::<Vec<_>>();
 
@@ -312,10 +316,10 @@ impl<T: ResLoader> ModelLoader for PmxLoader<T> {
                         let v = &pmx_vertices[global_vertex_index as usize];
                         let vertex = ModelVertex {
                             position: v.position.into(),
-                            tex_coords: [v.uv[0], 1.0 - v.uv[1]],
+                            tex_coords: [v.uv[0], 1.0 - v.uv[1]].into(),
                             normal: v.normal.into(),
-                            tangent: [0.0; 3],
-                            bitangent: [0.0; 3],
+                            tangent: glam::Vec3::ZERO,
+                            bitangent: glam::Vec3::ZERO,
                         };
                         let local_index = vertices.len() as u32;
                         vertices.push(vertex);
@@ -388,13 +392,13 @@ fn calculate_tangent_and_bitangent(vertices: &mut [ModelVertex], indices: &[u32]
         let v1 = &vertices[c1];
         let v2 = &vertices[c2];
 
-        let pos0: cgmath::Vector3<f32> = v0.position.into();
-        let pos1: cgmath::Vector3<f32> = v1.position.into();
-        let pos2: cgmath::Vector3<f32> = v2.position.into();
+        let pos0: glam::Vec3 = v0.position.into();
+        let pos1: glam::Vec3 = v1.position.into();
+        let pos2: glam::Vec3 = v2.position.into();
 
-        let uv0: cgmath::Vector2<f32> = v0.tex_coords.into();
-        let uv1: cgmath::Vector2<f32> = v1.tex_coords.into();
-        let uv2: cgmath::Vector2<f32> = v2.tex_coords.into();
+        let uv0: glam::Vec2 = v0.tex_coords.into();
+        let uv1: glam::Vec2 = v1.tex_coords.into();
+        let uv2: glam::Vec2 = v2.tex_coords.into();
 
         let delta_pos1 = pos1 - pos0;
         let delta_pos2 = pos2 - pos0;
@@ -406,12 +410,12 @@ fn calculate_tangent_and_bitangent(vertices: &mut [ModelVertex], indices: &[u32]
         let tangent = (delta_pos1 * delta_uv2.y - delta_pos2 * delta_uv1.y) * r;
         let bitangent = (delta_pos2 * delta_uv1.x - delta_pos1 * delta_uv2.x) * -r;
 
-        vertices[c0].tangent = (tangent + cgmath::Vector3::from(vertices[c0].tangent)).into();
-        vertices[c0].bitangent = (bitangent + cgmath::Vector3::from(vertices[c0].bitangent)).into();
-        vertices[c1].tangent = (tangent + cgmath::Vector3::from(vertices[c1].tangent)).into();
-        vertices[c1].bitangent = (bitangent + cgmath::Vector3::from(vertices[c1].bitangent)).into();
-        vertices[c2].tangent = (tangent + cgmath::Vector3::from(vertices[c2].tangent)).into();
-        vertices[c2].bitangent = (bitangent + cgmath::Vector3::from(vertices[c2].bitangent)).into();
+        vertices[c0].tangent = (tangent + glam::Vec3::from(vertices[c0].tangent)).into();
+        vertices[c0].bitangent = (bitangent + glam::Vec3::from(vertices[c0].bitangent)).into();
+        vertices[c1].tangent = (tangent + glam::Vec3::from(vertices[c1].tangent)).into();
+        vertices[c1].bitangent = (bitangent + glam::Vec3::from(vertices[c1].bitangent)).into();
+        vertices[c2].tangent = (tangent + glam::Vec3::from(vertices[c2].tangent)).into();
+        vertices[c2].bitangent = (bitangent + glam::Vec3::from(vertices[c2].bitangent)).into();
 
         triangles_included[c0] += 1;
         triangles_included[c1] += 1;
@@ -421,8 +425,8 @@ fn calculate_tangent_and_bitangent(vertices: &mut [ModelVertex], indices: &[u32]
     for (i, n) in triangles_included.into_iter().enumerate() {
         let denom = 1.0 / (n as f32);
         let v = &mut vertices[i];
-        v.tangent = (cgmath::Vector3::from(v.tangent) * denom).into();
-        v.bitangent = (cgmath::Vector3::from(v.bitangent) * denom).into();
+        v.tangent = (glam::Vec3::from(v.tangent) * denom).into();
+        v.bitangent = (glam::Vec3::from(v.bitangent) * denom).into();
     }
 }
 

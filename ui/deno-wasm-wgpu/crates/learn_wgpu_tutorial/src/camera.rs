@@ -1,4 +1,3 @@
-use cgmath::*;
 use std::f32::consts::FRAC_PI_2;
 use winit::dpi::PhysicalPosition;
 use winit::event::*;
@@ -8,59 +7,60 @@ const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
 #[derive(Debug)]
 pub struct Camera {
-    pub position: Point3<f32>,
-    yaw: Rad<f32>,
-    pitch: Rad<f32>,
+    pub position: glam::Vec3,
+    yaw_radians: f32,
+    pitch_radians: f32,
 }
 
 impl Camera {
-    pub fn new<V: Into<Point3<f32>>, Y: Into<Rad<f32>>, P: Into<Rad<f32>>>(
-        position: V,
-        yaw: Y,
-        pitch: P,
-    ) -> Self {
+    pub fn new<V: Into<glam::Vec3>>(position: V, yaw_radians: f32, pitch_radians: f32) -> Self {
         Self {
             position: position.into(),
-            yaw: yaw.into(),
-            pitch: pitch.into(),
+            yaw_radians,
+            pitch_radians,
         }
     }
 
-    pub fn calc_matrix(&self) -> Matrix4<f32> {
-        let (sin_pitch, cos_pitch) = self.pitch.0.sin_cos();
-        let (sin_yaw, cos_yaw) = self.yaw.0.sin_cos();
+    pub fn calc_matrix(&self) -> glam::Mat4 {
+        let (sin_pitch, cos_pitch) = self.pitch_radians.sin_cos();
+        let (sin_yaw, cos_yaw) = self.yaw_radians.sin_cos();
 
-        Matrix4::look_to_rh(
+        glam::Mat4::look_to_rh(
             self.position,
-            Vector3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize(),
-            Vector3::unit_y(),
+            glam::Vec3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize(),
+            glam::Vec3::Y,
         )
     }
 }
 
 pub struct Projection {
-    aspect: f32,
-    fovy: Rad<f32>,
-    znear: f32,
-    zfar: f32,
+    aspect_ratio: f32,
+    fov_y_radians: f32,
+    z_near: f32,
+    z_far: f32,
 }
 
 impl Projection {
-    pub fn new<F: Into<Rad<f32>>>(width: u32, height: u32, fovy: F, znear: f32, zfar: f32) -> Self {
+    pub fn new(width: u32, height: u32, fov_y_radians: f32, z_near: f32, z_far: f32) -> Self {
         Self {
-            aspect: width as f32 / height as f32,
-            fovy: fovy.into(),
-            znear,
-            zfar,
+            aspect_ratio: width as f32 / height as f32,
+            fov_y_radians: fov_y_radians.into(),
+            z_near,
+            z_far,
         }
     }
 
     pub fn resize(&mut self, width: u32, height: u32) {
-        self.aspect = width as f32 / height as f32;
+        self.aspect_ratio = width as f32 / height as f32;
     }
 
-    pub fn calc_matrix(&self) -> Matrix4<f32> {
-        perspective(self.fovy, self.aspect, self.znear, self.zfar)
+    pub fn calc_matrix(&self) -> glam::Mat4 {
+        glam::Mat4::perspective_rh(
+            self.fov_y_radians,
+            self.aspect_ratio,
+            self.z_near,
+            self.z_far,
+        )
     }
 }
 
@@ -146,9 +146,9 @@ impl CameraController {
 
     pub fn update_camera(&mut self, camera: &mut Camera, dt_s: f32) {
         // Move forward/backward and left/right
-        let (yaw_sin, yaw_cos) = camera.yaw.0.sin_cos();
-        let forward = Vector3::new(yaw_cos, 0.0, yaw_sin).normalize();
-        let right = Vector3::new(-yaw_sin, 0.0, yaw_cos).normalize();
+        let (yaw_sin, yaw_cos) = camera.yaw_radians.sin_cos();
+        let forward = glam::vec3(yaw_cos, 0.0, yaw_sin).normalize();
+        let right = glam::vec3(-yaw_sin, 0.0, yaw_cos).normalize();
         camera.position +=
             forward * (self.amount_forward - self.amount_backward) * self.speed * dt_s;
         camera.position += right * (self.amount_right - self.amount_left) * self.speed * dt_s;
@@ -157,9 +157,9 @@ impl CameraController {
         // Note: this isn't an actual zoom. The camera's position
         // changes when zooming. I've added this to make it easier
         // to get closer to an object you want to focus on.
-        let (pitch_sin, pitch_cos) = camera.pitch.0.sin_cos();
+        let (pitch_sin, pitch_cos) = camera.pitch_radians.sin_cos();
         let scrollward =
-            Vector3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
+            glam::vec3(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
         camera.position += scrollward * self.scroll * self.speed * self.sensitivity * dt_s;
         self.scroll = 0.0;
 
@@ -168,8 +168,8 @@ impl CameraController {
         camera.position.y += (self.amount_up - self.amount_down) * self.speed * dt_s;
 
         // Rotate
-        camera.yaw += Rad(self.rotate_horizontal) * self.sensitivity * dt_s;
-        camera.pitch += Rad(-self.rotate_vertical) * self.sensitivity * dt_s;
+        camera.yaw_radians += self.rotate_horizontal * self.sensitivity * dt_s;
+        camera.pitch_radians += -self.rotate_vertical * self.sensitivity * dt_s;
 
         // If process_mouse isn't called every frame, these values
         // will not get set to zero, and the camera will rotate
@@ -178,10 +178,10 @@ impl CameraController {
         self.rotate_vertical = 0.0;
 
         // Keep the camera's angle from going too high/low.
-        if camera.pitch < -Rad(SAFE_FRAC_PI_2) {
-            camera.pitch = -Rad(SAFE_FRAC_PI_2);
-        } else if camera.pitch > Rad(SAFE_FRAC_PI_2) {
-            camera.pitch = Rad(SAFE_FRAC_PI_2);
+        if camera.pitch_radians < -SAFE_FRAC_PI_2 {
+            camera.pitch_radians = -SAFE_FRAC_PI_2;
+        } else if camera.pitch_radians > SAFE_FRAC_PI_2 {
+            camera.pitch_radians = SAFE_FRAC_PI_2;
         }
     }
 }

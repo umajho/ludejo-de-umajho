@@ -16,8 +16,6 @@ use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use cgmath::prelude::*;
-
 use wgpu::util::DeviceExt;
 use winit::event::{DeviceEvent, ElementState, MouseButton};
 use winit::event_loop::EventLoop;
@@ -181,9 +179,18 @@ impl State {
                 label: Some("texture_bind_group_layout"),
             });
 
-        let camera = camera::Camera::new((0.0, 5.0, 10.0), cgmath::Deg(-90.0), cgmath::Deg(-20.0));
-        let projection =
-            camera::Projection::new(config.width, config.height, cgmath::Deg(45.0), 0.1, 100.0);
+        let camera = camera::Camera::new(
+            (0.0, 5.0, 10.0),
+            -90.0_f32.to_radians(),
+            -20.0_f32.to_radians(),
+        );
+        let projection = camera::Projection::new(
+            config.width,
+            config.height,
+            45.0_f32.to_radians(),
+            0.1,
+            100.0,
+        );
         let camera_controller = camera::CameraController::new(4.0, 0.4);
 
         let mut camera_uniform = CameraUniform::new();
@@ -219,9 +226,9 @@ impl State {
         });
 
         let light_uniform = LightUniform {
-            position: [2.0, 2.0, 2.0],
+            position: glam::vec3(2.0, 2.0, 2.0),
             _padding: 0,
-            color: [1.0, 1.0, 1.0],
+            color: glam::vec3(1.0, 1.0, 1.0),
             _padding2: 0,
         };
 
@@ -413,10 +420,10 @@ impl State {
         );
 
         {
-            let old_position: cgmath::Vector3<_> = self.light_uniform.position.into();
-            self.light_uniform.position = (cgmath::Quaternion::from_axis_angle(
-                cgmath::Vector3::unit_y(),
-                cgmath::Rad(time_delta_ms as f32 / 1000.0 * std::f32::consts::TAU),
+            let old_position = self.light_uniform.position;
+            self.light_uniform.position = (glam::Quat::from_axis_angle(
+                glam::Vec3::Y,
+                time_delta_ms as f32 / 1000.0 * std::f32::consts::TAU,
             ) * old_position)
                 .into();
             self.queue.write_buffer(
@@ -669,58 +676,57 @@ pub fn new_render_pipeline(
 #[repr(C)]
 #[derive(Clone, Copy, Debug, bytemuck::Pod, bytemuck::Zeroable)]
 struct CameraUniform {
-    view_position: [f32; 4],
-    view: [[f32; 4]; 4],
-    view_proj: [[f32; 4]; 4],
-    inv_proj: [[f32; 4]; 4],
-    inv_view: [[f32; 4]; 4],
+    view_position: glam::Vec4,
+    view: glam::Mat4,
+    view_proj: glam::Mat4,
+    inv_proj: glam::Mat4,
+    inv_view: glam::Mat4,
 }
 
 impl CameraUniform {
     fn new() -> Self {
         Self {
-            view_position: [0.0; 4],
-            view: cgmath::Matrix4::identity().into(),
-            view_proj: cgmath::Matrix4::identity().into(),
-            inv_proj: cgmath::Matrix4::identity().into(),
-            inv_view: cgmath::Matrix4::identity().into(),
+            view_position: glam::Vec4::ZERO,
+            view: glam::Mat4::IDENTITY,
+            view_proj: glam::Mat4::IDENTITY,
+            inv_proj: glam::Mat4::IDENTITY,
+            inv_view: glam::Mat4::IDENTITY,
         }
     }
 
     fn update_view_proj(&mut self, camera: &camera::Camera, projection: &camera::Projection) {
-        self.view_position = camera.position.to_homogeneous().into();
+        self.view_position = camera.position.extend(1.0);
         let proj = projection.calc_matrix();
         let view = camera.calc_matrix();
         let view_proj = proj * view;
         self.view = view.into();
         self.view_proj = view_proj.into();
-        self.inv_proj = proj.invert().unwrap().into();
+        self.inv_proj = proj.inverse().into();
         self.inv_view = view.transpose().into();
     }
 }
 
 struct Instance {
-    position: cgmath::Vector3<f32>,
-    rotation: cgmath::Quaternion<f32>,
-    scale: cgmath::Vector3<f32>,
+    position: glam::Vec3,
+    rotation: glam::Quat,
+    scale: glam::Vec3,
 }
 
 #[repr(C)]
 #[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct InstanceRaw {
-    model: [[f32; 4]; 4],
-    normal: [[f32; 3]; 3],
-    scale: [f32; 3],
+    model: glam::Mat4,
+    normal: glam::Mat3,
+    scale: glam::Vec3,
 }
 
 impl From<&Instance> for InstanceRaw {
     fn from(value: &Instance) -> Self {
         Self {
-            model: (cgmath::Matrix4::from_translation(value.position)
-                * cgmath::Matrix4::from(value.rotation))
-            .into(),
-            normal: cgmath::Matrix3::from(value.rotation).into(),
-            scale: value.scale.into(),
+            model: glam::Mat4::from_translation(value.position)
+                * glam::Mat4::from_quat(value.rotation.normalize()),
+            normal: glam::Mat3::from_quat(value.rotation.normalize()),
+            scale: value.scale,
         }
     }
 }
@@ -751,16 +757,16 @@ struct Instances {
     instance_buffer: wgpu::Buffer,
 
     instances_per_row: usize,
-    instance_displacement: cgmath::Vector3<f32>,
+    instance_displacement: glam::Vec3,
 }
 
 impl Instances {
     const GLOBAL_SCALE_CONTROL: f32 = 0.8;
 
     fn new(device: &wgpu::Device, instances_per_row: usize) -> Self {
-        let scale = cgmath::Vector3::new(1.0, 1.0, 1.0);
+        let scale = glam::vec3(1.0, 1.0, 1.0);
 
-        let instance_displacement = cgmath::Vector3::new(
+        let instance_displacement = glam::vec3(
             instances_per_row as f32 * 0.5,
             0.0,
             instances_per_row as f32 * 0.5,
@@ -769,11 +775,8 @@ impl Instances {
         let instances = (0..instances_per_row)
             .flat_map(|_z| {
                 (0..instances_per_row).map(move |_x| Instance {
-                    position: cgmath::Vector3::zero(),
-                    rotation: cgmath::Quaternion::from_axis_angle(
-                        cgmath::Vector3::unit_z(),
-                        cgmath::Deg(0.0),
-                    ),
+                    position: glam::Vec3::ZERO,
+                    rotation: glam::Quat::from_rotation_z(0.0),
                     scale,
                 })
             })
@@ -822,19 +825,14 @@ impl Instances {
 
                 let instance = &mut self.instances[i * self.instances_per_row + j];
 
-                let position = cgmath::Vector3 {
+                let position = glam::vec3(
                     x,
-                    y: Self::TRANSLATE_Y_AMPLITUDE
-                        * (final_progress_1 * std::f32::consts::TAU).sin(),
+                    Self::TRANSLATE_Y_AMPLITUDE * (final_progress_1 * std::f32::consts::TAU).sin(),
                     z,
-                } - self.instance_displacement;
-                let rotation = cgmath::Quaternion::from_axis_angle(
-                    cgmath::Vector3::unit_y(),
-                    cgmath::Rad(final_progress_2 * std::f32::consts::TAU),
-                ) * cgmath::Quaternion::from_axis_angle(
-                    cgmath::Vector3::unit_x(),
-                    cgmath::Rad(final_progress_3 * std::f32::consts::TAU),
-                );
+                ) - self.instance_displacement;
+                let rotation =
+                    glam::Quat::from_rotation_y(final_progress_2 * std::f32::consts::TAU)
+                        * glam::Quat::from_rotation_x(final_progress_3 * std::f32::consts::TAU);
 
                 let scale = Self::SCALE_AMPLITUDE_RANGE.start
                     + (Self::SCALE_AMPLITUDE_RANGE.end - Self::SCALE_AMPLITUDE_RANGE.start)
@@ -842,8 +840,7 @@ impl Instances {
 
                 instance.position = position;
                 instance.rotation = rotation;
-                instance.scale =
-                    cgmath::Vector3::new(scale, scale, scale) * Self::GLOBAL_SCALE_CONTROL;
+                instance.scale = glam::vec3(scale, scale, scale) * Self::GLOBAL_SCALE_CONTROL;
             }
         }
 
@@ -1014,8 +1011,8 @@ impl ApplicationHandler<State> for App {
 #[repr(C)]
 #[derive(Debug, Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
 struct LightUniform {
-    position: [f32; 3],
+    position: glam::Vec3,
     _padding: u32,
-    color: [f32; 3],
+    color: glam::Vec3,
     _padding2: u32,
 }
