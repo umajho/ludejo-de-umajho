@@ -1,10 +1,10 @@
 use wgpu::util::DeviceExt;
 
-use crate::{models::ShapeVertex, shaders, textures};
+use crate::{models::ShapeVertex, textures};
 
 // https://github.com/sotrh/learn-wgpu/blob/075f2a53b5112f3275aad1746104013e7316c80b/code/beginner/tutorial8-depth/src/challenge.rs#L278
 pub struct DepthPass {
-    pub texture: textures::Texture,
+    pub texture: textures::DepthTextureNonComparisonSampler,
     layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
     vertex_buffer: wgpu::Buffer,
@@ -38,14 +38,8 @@ impl DepthPass {
     pub fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
-        shader: &shaders::RenderShader,
+        shader: &super::drawing::shaders::RenderShader,
     ) -> Self {
-        let texture = textures::Texture::create_depth_texture_non_comparison_sampler(
-            device,
-            config,
-            "depth_texture",
-        );
-
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Depth Pass Layout"),
             entries: &[
@@ -68,20 +62,7 @@ impl DepthPass {
             ],
         });
 
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&texture.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&texture.sampler),
-                },
-            ],
-            label: Some("depth_pass.bind_group"),
-        });
+        let (texture, bind_group) = Self::make_texture_and_bind_group(device, &layout, config);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Depth Pass VB"),
@@ -103,11 +84,11 @@ impl DepthPass {
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Depth Pass Render Pipeline"),
             layout: Some(&pipeline_layout),
-            vertex: shader.vertex_state(shaders::VertexStatePartial {
+            vertex: shader.vertex_state(super::drawing::shaders::VertexStatePartial {
                 buffers: &[ShapeVertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
-            fragment: shader.fragment_state(shaders::FragmentStatePartial {
+            fragment: shader.fragment_state(super::drawing::shaders::FragmentStatePartial {
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
                     blend: Some(wgpu::BlendState {
@@ -155,25 +136,40 @@ impl DepthPass {
     }
 
     pub fn resize(&mut self, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) {
-        self.texture = textures::Texture::create_depth_texture_non_comparison_sampler(
-            device,
-            config,
-            "depth_texture",
-        );
-        self.bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &self.layout,
+        (self.texture, self.bind_group) =
+            Self::make_texture_and_bind_group(device, &self.layout, config);
+    }
+
+    fn make_texture_and_bind_group(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        config: &wgpu::SurfaceConfiguration,
+    ) -> (textures::DepthTextureNonComparisonSampler, wgpu::BindGroup) {
+        let texture =
+            textures::DepthTextureNonComparisonSampler::new(device, config, "depth_texture");
+        let bind_group = Self::make_bind_group(device, layout, &texture);
+        (texture, bind_group)
+    }
+
+    fn make_bind_group(
+        device: &wgpu::Device,
+        layout: &wgpu::BindGroupLayout,
+        texture: &textures::DepthTextureNonComparisonSampler,
+    ) -> wgpu::BindGroup {
+        device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &layout,
             entries: &[
                 wgpu::BindGroupEntry {
                     binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&self.texture.view),
+                    resource: wgpu::BindingResource::TextureView(texture.view()),
                 },
                 wgpu::BindGroupEntry {
                     binding: 1,
-                    resource: wgpu::BindingResource::Sampler(&self.texture.sampler),
+                    resource: wgpu::BindingResource::Sampler(texture.sampler()),
                 },
             ],
             label: Some("depth_pass.bind_group"),
-        });
+        })
     }
 
     #[allow(unused)]

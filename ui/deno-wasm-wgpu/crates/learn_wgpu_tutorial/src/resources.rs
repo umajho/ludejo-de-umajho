@@ -3,11 +3,11 @@ use std::io::{BufReader, Cursor};
 use glam::Vec3;
 use rust_embed::Embed;
 
-use wgpu::{ComputePassDescriptor, util::DeviceExt};
+use wgpu::util::DeviceExt;
 
 use crate::{
+    drawing::textures,
     models::{Material, Mesh, Model, ModelVertex},
-    shaders, textures,
 };
 
 #[derive(Embed)]
@@ -68,13 +68,18 @@ impl<T: rust_embed::RustEmbed> ResLoader for EmbedResLoader<T> {
 }
 
 pub trait ModelLoader {
-    fn load_texture(
+    fn load_diffuse_texture(
         &self,
         filename: &str,
-        is_normal_map: bool,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-    ) -> anyhow::Result<textures::Texture>;
+    ) -> anyhow::Result<textures::D2DiffuseTexture>;
+    fn load_normal_texture(
+        &self,
+        filename: &str,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> anyhow::Result<textures::D2NormalTexture>;
     fn load_model(
         &self,
         filename: &str,
@@ -95,15 +100,26 @@ impl<T: ResLoader> ObjLoader<T> {
 }
 
 impl<T: ResLoader> ModelLoader for ObjLoader<T> {
-    fn load_texture(
+    fn load_diffuse_texture(
         &self,
         filename: &str,
-        is_normal_map: bool,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-    ) -> anyhow::Result<textures::Texture> {
+    ) -> anyhow::Result<textures::D2DiffuseTexture> {
         let data = self.res_loader.load_binary(filename)?;
-        let texture = textures::Texture::from_bytes(device, queue, &data, filename, is_normal_map)?;
+        let texture =
+            textures::D2DiffuseTexture::from_image_in_memory(device, queue, &data, filename)?;
+        Ok(texture)
+    }
+    fn load_normal_texture(
+        &self,
+        filename: &str,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> anyhow::Result<textures::D2NormalTexture> {
+        let data = self.res_loader.load_binary(filename)?;
+        let texture =
+            textures::D2NormalTexture::from_image_in_memory(device, queue, &data, filename)?;
         Ok(texture)
     }
 
@@ -133,16 +149,11 @@ impl<T: ResLoader> ModelLoader for ObjLoader<T> {
 
         let mut materials = Vec::new();
         for m in obj_materials? {
-            let diffuse_texture =
-                self.load_texture(&m.diffuse_texture.unwrap(), false, device, queue)?;
-            let normal_texture =
-                self.load_texture(&m.normal_texture.unwrap(), true, device, queue)?;
-
             materials.push(Material::new(
                 device,
                 &m.name,
-                diffuse_texture,
-                normal_texture,
+                self.load_diffuse_texture(&m.diffuse_texture.unwrap(), device, queue)?,
+                self.load_normal_texture(&m.normal_texture.unwrap(), device, queue)?,
                 layout,
             ));
         }
@@ -221,15 +232,26 @@ impl<T: ResLoader> PmxLoader<T> {
 }
 
 impl<T: ResLoader> ModelLoader for PmxLoader<T> {
-    fn load_texture(
+    fn load_diffuse_texture(
         &self,
         filename: &str,
-        is_normal_map: bool,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-    ) -> anyhow::Result<textures::Texture> {
+    ) -> anyhow::Result<textures::D2DiffuseTexture> {
         let data = self.res_loader.load_binary(filename)?;
-        let texture = textures::Texture::from_bytes(device, queue, &data, filename, is_normal_map)?;
+        let texture =
+            textures::D2DiffuseTexture::from_image_in_memory(device, queue, &data, filename)?;
+        Ok(texture)
+    }
+    fn load_normal_texture(
+        &self,
+        filename: &str,
+        device: &wgpu::Device,
+        queue: &wgpu::Queue,
+    ) -> anyhow::Result<textures::D2NormalTexture> {
+        let data = self.res_loader.load_binary(filename)?;
+        let texture =
+            textures::D2NormalTexture::from_image_in_memory(device, queue, &data, filename)?;
         Ok(texture)
     }
 
@@ -280,13 +302,9 @@ impl<T: ResLoader> ModelLoader for PmxLoader<T> {
         let mut meshes = Vec::new();
         let mut triangle_index_offset = 0;
         for (m_i, m) in pmx_materials.iter().enumerate() {
-            let diffuse_texture = self.load_texture(
-                &texture_list[m.texture_index as usize],
-                false,
-                device,
-                queue,
-            )?;
-            let size = diffuse_texture.texture.size();
+            let diffuse_texture =
+                self.load_diffuse_texture(&texture_list[m.texture_index as usize], device, queue)?;
+            let size = diffuse_texture.size();
 
             let normal_texture = new_flat_normal_texture(device, queue, size.width, size.height);
 
@@ -368,18 +386,12 @@ fn new_flat_normal_texture(
     queue: &wgpu::Queue,
     width: u32,
     height: u32,
-) -> textures::Texture {
+) -> textures::D2NormalTexture {
     let normal_data = vec![128u8, 128u8, 255u8].repeat((width * height) as usize);
     let image = image::RgbImage::from_vec(width, height, normal_data).unwrap();
+    let image = image::DynamicImage::ImageRgb8(image);
 
-    textures::Texture::from_image(
-        device,
-        queue,
-        &image::DynamicImage::ImageRgb8(image),
-        None,
-        true,
-    )
-    .unwrap()
+    textures::D2NormalTexture::from_image(device, queue, &image, None)
 }
 
 fn calculate_tangent_and_bitangent(vertices: &mut [ModelVertex], indices: &[u32]) {
@@ -427,176 +439,5 @@ fn calculate_tangent_and_bitangent(vertices: &mut [ModelVertex], indices: &[u32]
         let v = &mut vertices[i];
         v.tangent = (glam::Vec3::from(v.tangent) * denom).into();
         v.bitangent = (glam::Vec3::from(v.bitangent) * denom).into();
-    }
-}
-
-pub struct HdrLoader {
-    texture_format: wgpu::TextureFormat,
-    equirect_layout: wgpu::BindGroupLayout,
-    equirect_to_cubemap: wgpu::ComputePipeline,
-}
-
-impl HdrLoader {
-    pub fn new(device: &wgpu::Device) -> Self {
-        let texture_format = wgpu::TextureFormat::Rgba32Float;
-        let equirect_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("HdrLoader::equirect_layout"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: false },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::COMPUTE,
-                    ty: wgpu::BindingType::StorageTexture {
-                        access: wgpu::StorageTextureAccess::WriteOnly,
-                        format: texture_format,
-                        view_dimension: wgpu::TextureViewDimension::D2Array,
-                    },
-                    count: None,
-                },
-            ],
-        });
-
-        let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
-            bind_group_layouts: &[&equirect_layout],
-            push_constant_ranges: &[],
-        });
-
-        let equirect_to_cubemap = device.create_compute_pipeline(
-            &shaders::c_equirectangular(device).compute_pipeline_descriptor(
-                shaders::ComputePipelineDescriptorPartial {
-                    label: Some("equirect_to_cube_map"),
-                    layout: Some(&pipeline_layout),
-                    compilation_options: Default::default(),
-                    cache: None,
-                },
-            ),
-        );
-
-        Self {
-            texture_format,
-            equirect_layout,
-            equirect_to_cubemap,
-        }
-    }
-
-    pub fn from_equirectangular_bytes(
-        &self,
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        data: &[u8],
-        dst_size: u32,
-        label: Option<&str>,
-    ) -> anyhow::Result<textures::CubeTexture> {
-        let hdr_decoder = image::codecs::hdr::HdrDecoder::new(Cursor::new(data))?;
-        let meta = hdr_decoder.metadata();
-
-        let pixels = cfg_select! {
-          target_arch = "wasm32" => {{
-            hdr_decoder.read_image_native()?
-              .into_iter()
-              .map(|pix| {
-                let rgb = pix.to_hdr();
-                [rgb.0[0], rgb.0[1], rgb.0[2], 1.0f32]
-              })
-              .collect::<Vec<_>>()
-          }}
-          _ => {{
-            let mut pixels = vec![[0.0; 4]; meta.width as usize * meta.height as usize];
-            hdr_decoder.read_image_transform(
-              |pix| {
-                let rgb = pix.to_hdr();
-                [rgb.0[0], rgb.0[1], rgb.0[2], 1.0f32]
-              },
-              &mut pixels[..],
-            )?;
-            pixels
-          }}
-        };
-
-        let src = textures::Texture::create_2d_texture(
-            device,
-            meta.width,
-            meta.height,
-            self.texture_format,
-            wgpu::TextureUsages::TEXTURE_BINDING | wgpu::TextureUsages::COPY_DST,
-            wgpu::FilterMode::Linear,
-            None,
-        );
-
-        queue.write_texture(
-            wgpu::TexelCopyTextureInfo {
-                texture: &src.texture,
-                mip_level: 0,
-                origin: wgpu::Origin3d::ZERO,
-                aspect: wgpu::TextureAspect::All,
-            },
-            &bytemuck::cast_slice(&pixels),
-            wgpu::TexelCopyBufferLayout {
-                offset: 0,
-                bytes_per_row: Some(src.size.width * std::mem::size_of::<[f32; 4]>() as u32),
-                rows_per_image: Some(src.size.height),
-            },
-            src.size,
-        );
-
-        let dst = textures::CubeTexture::create_2d(
-            device,
-            dst_size,
-            dst_size,
-            self.texture_format,
-            1,
-            wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
-            wgpu::FilterMode::Nearest,
-            label,
-        );
-
-        let dst_view = dst.texture().create_view(&wgpu::TextureViewDescriptor {
-            label,
-            dimension: Some(wgpu::TextureViewDimension::D2Array),
-            ..Default::default()
-        });
-
-        let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label,
-            layout: &self.equirect_layout,
-            entries: &[
-                wgpu::BindGroupEntry {
-                    binding: 0,
-                    resource: wgpu::BindingResource::TextureView(&src.view),
-                },
-                wgpu::BindGroupEntry {
-                    binding: 1,
-                    resource: wgpu::BindingResource::TextureView(&dst_view),
-                },
-            ],
-        });
-
-        let mut encoder = device.create_command_encoder(&Default::default());
-
-        {
-            let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label,
-                timestamp_writes: None,
-            });
-
-            let num_workgroups = (dst_size + 15) / 16;
-            pass.set_pipeline(&self.equirect_to_cubemap);
-            pass.set_bind_group(0, &bind_group, &[]);
-            pass.dispatch_workgroups(num_workgroups, num_workgroups, 6);
-        }
-
-        queue.submit(Some(encoder.finish()));
-
-        Ok(dst)
     }
 }

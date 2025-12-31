@@ -1,12 +1,8 @@
-import package::definitions::camera::CameraUniform;
+import package::definitions::{camera::CameraUniform, light::Light};
 
 @group(1) @binding(0)
 var<uniform> camera: CameraUniform;
 
-struct Light {
-  position: vec3<f32>,
-  color: vec3<f32>,
-}
 @group(2) @binding(0)
 var<uniform> light: Light;
 

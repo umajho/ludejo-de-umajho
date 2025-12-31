@@ -1,9 +1,17 @@
 fn main() {
-    let wesl = wesl::Wesl::new("src/shaders");
+    let wesl = wesl::Wesl::new("src/drawing/shaders");
 
-    wesl.build_artifact(&"package::render::main".parse().unwrap(), "render_main");
-    wesl.build_artifact(&"package::render::depth".parse().unwrap(), "render_depth");
-    wesl.build_artifact(&"package::render::light".parse().unwrap(), "render_light");
+    wesl.build_artifact(&"package::render::model".parse().unwrap(), "render_model");
+    wesl.build_artifact(
+        &"package::render::depth_debug".parse().unwrap(),
+        "render_depth_debug",
+    );
+    wesl.build_artifact(
+        &"package::render::light_source_indicator_model"
+            .parse()
+            .unwrap(),
+        "render_light_source_indicator_model",
+    );
     wesl.build_artifact(&"package::render::sky".parse().unwrap(), "render_sky");
     wesl.build_artifact(
         &"package::render::hdr_tonemapping".parse().unwrap(),

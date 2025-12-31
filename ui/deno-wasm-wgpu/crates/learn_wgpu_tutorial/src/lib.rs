@@ -3,11 +3,10 @@
 
 mod camera;
 mod copied;
+mod drawing;
 mod hdr_tonemapping;
 mod models;
 mod resources;
-mod shaders;
-mod textures;
 mod utils;
 
 use std::ops::Range;
@@ -27,6 +26,7 @@ use winit::{
     window::Window,
 };
 
+use crate::drawing::textures;
 use crate::models::{DrawModel, Model, ModelVertex, Vertex};
 use crate::resources::{ModelLoader, ResLoader};
 
@@ -265,14 +265,15 @@ impl State {
 
         let sky_res_loader = resources::EmbedResLoader::<resources::ResSky>::new("sky");
         let sky_bytes = sky_res_loader.load_binary("pure-sky.hdr")?;
-        let hdr_loader = resources::HdrLoader::new(&device);
-        let sky_texture = hdr_loader.from_equirectangular_bytes(
-            &device,
-            &queue,
-            &sky_bytes,
-            1080,
-            Some("Sky Texture"),
-        )?;
+        let cube_texture_factory = drawing::textures::CubeTextureFactory::new(&device);
+        let sky_texture = cube_texture_factory
+            .try_make_cube_texture_from_equirectangular_hdr_image_in_memory(
+                &device,
+                &queue,
+                &sky_bytes,
+                1080,
+                "Sky Texture",
+            )?;
 
         let environment_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
@@ -322,10 +323,10 @@ impl State {
                 &device,
                 &layout,
                 hdr.format(),
-                Some(textures::Texture::DEPTH_FORMAT),
+                Some(textures::DEPTH_FORMAT),
                 &[],
                 wgpu::PrimitiveTopology::TriangleList,
-                &shaders::r_sky(&device),
+                &drawing::shaders::r_sky(&device),
             )
         };
 
@@ -338,7 +339,8 @@ impl State {
             &environment_layout,
         );
 
-        let depth_pass = copied::DepthPass::new(&device, &config, &shaders::r_depth(&device));
+        let depth_pass =
+            copied::DepthPass::new(&device, &config, &drawing::shaders::r_depth_debug(&device));
 
         let obj_res_loader = resources::EmbedResLoader::<resources::ResCube>::new("cube");
         let obj_model_loader = resources::ObjLoader::new(obj_res_loader);
@@ -474,7 +476,7 @@ impl State {
                     },
                 })],
                 depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_pass.texture.view,
+                    view: &self.depth_pass.texture.view(),
                     depth_ops: Some(wgpu::Operations {
                         load: wgpu::LoadOp::Clear(1.0),
                         store: wgpu::StoreOp::Store,
@@ -485,14 +487,14 @@ impl State {
                 timestamp_writes: None,
             });
 
-            render_pass.set_vertex_buffer(1, self.instances.instance_buffer.slice(..));
-
             render_pass.set_pipeline(self.render_pipelines.light());
             render_pass.draw_light_model(
                 &self.obj_model,
                 &self.camera_bind_group,
                 &self.light_bind_group,
             );
+
+            render_pass.set_vertex_buffer(1, self.instances.instance_buffer.slice(..));
 
             render_pass.set_pipeline(self.render_pipelines.main(self.is_challenge));
             render_pass.draw_model_instanced(
@@ -578,10 +580,10 @@ impl RenderPipelines {
                 device,
                 &layout,
                 hdr.format(),
-                Some(textures::Texture::DEPTH_FORMAT),
+                Some(textures::DEPTH_FORMAT),
                 &[ModelVertex::desc(), InstanceRaw::desc()],
                 wgpu::PrimitiveTopology::TriangleList,
-                &shaders::r_main(device),
+                &drawing::shaders::r_model(device),
             )
         };
 
@@ -596,10 +598,10 @@ impl RenderPipelines {
                 device,
                 &layout,
                 hdr.format(),
-                Some(textures::Texture::DEPTH_FORMAT),
+                Some(textures::DEPTH_FORMAT),
                 &[ModelVertex::desc()],
                 wgpu::PrimitiveTopology::TriangleList,
-                &shaders::r_light(device),
+                &drawing::shaders::r_light_source_indicator_model(device),
             )
         };
 
@@ -626,16 +628,16 @@ pub fn new_render_pipeline(
     depth_format: Option<wgpu::TextureFormat>,
     vertex_layouts: &[wgpu::VertexBufferLayout],
     topology: wgpu::PrimitiveTopology,
-    shader: &shaders::RenderShader,
+    shader: &drawing::shaders::RenderShader,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
         label: Some(format!("Render Pipeline: {}", name).as_str()),
         layout: Some(&layout),
-        vertex: shader.vertex_state(shaders::VertexStatePartial {
+        vertex: shader.vertex_state(drawing::shaders::VertexStatePartial {
             compilation_options: wgpu::PipelineCompilationOptions::default(),
             buffers: vertex_layouts,
         }),
-        fragment: shader.fragment_state(shaders::FragmentStatePartial {
+        fragment: shader.fragment_state(drawing::shaders::FragmentStatePartial {
             targets: &[Some(wgpu::ColorTargetState {
                 format: color_format.add_srgb_suffix(),
                 blend: Some(wgpu::BlendState::REPLACE),

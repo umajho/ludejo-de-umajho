@@ -1,13 +1,15 @@
-pub fn r_main(device: &wgpu::Device) -> RenderShader {
-    RenderShader(device.create_shader_module(include_wesl_desc!("render_main")))
+pub fn r_model(device: &wgpu::Device) -> RenderShader {
+    RenderShader(device.create_shader_module(include_wesl_desc!("render_model")))
 }
 
-pub fn r_depth(device: &wgpu::Device) -> RenderShader {
-    RenderShader(device.create_shader_module(include_wesl_desc!("render_depth")))
+pub fn r_depth_debug(device: &wgpu::Device) -> RenderShader {
+    RenderShader(device.create_shader_module(include_wesl_desc!("render_depth_debug")))
 }
 
-pub fn r_light(device: &wgpu::Device) -> RenderShader {
-    RenderShader(device.create_shader_module(include_wesl_desc!("render_light")))
+pub fn r_light_source_indicator_model(device: &wgpu::Device) -> RenderShader {
+    RenderShader(
+        device.create_shader_module(include_wesl_desc!("render_light_source_indicator_model")),
+    )
 }
 
 pub fn r_sky(device: &wgpu::Device) -> RenderShader {
