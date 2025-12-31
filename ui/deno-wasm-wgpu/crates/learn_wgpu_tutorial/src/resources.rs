@@ -316,7 +316,7 @@ impl<T: ResLoader> ModelLoader for PmxLoader<T> {
                         let v = &pmx_vertices[global_vertex_index as usize];
                         let vertex = ModelVertex {
                             position: v.position.into(),
-                            tex_coords: [v.uv[0], 1.0 - v.uv[1]].into(),
+                            tex_coords: [v.uv[0], v.uv[1]].into(),
                             normal: v.normal.into(),
                             tangent: glam::Vec3::ZERO,
                             bitangent: glam::Vec3::ZERO,
