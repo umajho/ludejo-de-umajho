@@ -15,7 +15,7 @@ pub(super) struct D2Texture<T: super::TextureFormat> {
 }
 
 impl<T: super::TextureFormat> D2Texture<T> {
-    pub(super) fn from_pixel_buffer(
+    pub fn from_pixel_buffer(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         dimensions: (u32, u32),
@@ -53,11 +53,7 @@ impl<T: super::TextureFormat> D2Texture<T> {
         texture
     }
 
-    pub(super) fn new(
-        device: &wgpu::Device,
-        label: Option<&str>,
-        opts: NewD2TextureOptions,
-    ) -> Self {
+    pub fn new(device: &wgpu::Device, label: Option<&str>, opts: NewD2TextureOptions) -> Self {
         let format = if opts.is_color_map {
             T::srgb()
         } else {
@@ -98,7 +94,7 @@ impl<T: super::TextureFormat> D2Texture<T> {
         }
     }
 
-    pub(super) fn from_image_in_memory(
+    pub fn from_image_in_memory(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         bytes: &[u8],
@@ -110,7 +106,7 @@ impl<T: super::TextureFormat> D2Texture<T> {
         Ok(texture)
     }
 
-    pub(super) fn from_image(
+    pub fn from_image(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         img: &image::DynamicImage,
@@ -123,19 +119,19 @@ impl<T: super::TextureFormat> D2Texture<T> {
         Self::from_pixel_buffer(device, queue, dimensions, &rgba, label, is_color_map)
     }
 
-    pub(super) fn texture(&self) -> &wgpu::Texture {
+    pub fn texture(&self) -> &wgpu::Texture {
         &self.texture
     }
 
-    pub(super) fn view(&self) -> &wgpu::TextureView {
+    pub fn view(&self) -> &wgpu::TextureView {
         &self.view
     }
 
-    pub(super) fn sampler(&self) -> &wgpu::Sampler {
+    pub fn sampler(&self) -> &wgpu::Sampler {
         &self.sampler
     }
 
-    pub(super) fn size(&self) -> wgpu::Extent3d {
+    pub fn size(&self) -> wgpu::Extent3d {
         self.texture.size()
     }
 }

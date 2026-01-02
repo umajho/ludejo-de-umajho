@@ -13,19 +13,19 @@ impl D2DiffuseTexture {
         Ok(Self(inner))
     }
 
-    pub fn from_image(
-        device: &wgpu::Device,
-        queue: &wgpu::Queue,
-        img: &image::DynamicImage,
-        label: Option<&str>,
-    ) -> Self {
-        let inner = D2TextureRgba8::from_image(device, queue, img, label, true);
-        Self(inner)
-    }
+    // pub fn from_image(
+    //     device: &wgpu::Device,
+    //     queue: &wgpu::Queue,
+    //     img: &image::DynamicImage,
+    //     label: Option<&str>,
+    // ) -> Self {
+    //     let inner = D2TextureRgba8::from_image(device, queue, img, label, true);
+    //     Self(inner)
+    // }
 
-    pub fn texture(&self) -> &wgpu::Texture {
-        &self.0.texture()
-    }
+    // pub fn texture(&self) -> &wgpu::Texture {
+    //     &self.0.texture()
+    // }
 
     pub fn view(&self) -> &wgpu::TextureView {
         &self.0.view()

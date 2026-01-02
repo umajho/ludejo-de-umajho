@@ -3,66 +3,9 @@ use winit::dpi::PhysicalPosition;
 use winit::event::*;
 use winit::keyboard::KeyCode;
 
+use crate::drawing::systems::camera_system::CameraData;
+
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
-
-#[derive(Debug)]
-pub struct Camera {
-    pub position: glam::Vec3,
-    yaw_radians: f32,
-    pitch_radians: f32,
-}
-
-impl Camera {
-    pub fn new<V: Into<glam::Vec3>>(position: V, yaw_radians: f32, pitch_radians: f32) -> Self {
-        Self {
-            position: position.into(),
-            yaw_radians,
-            pitch_radians,
-        }
-    }
-
-    pub fn calc_matrix(&self) -> glam::Mat4 {
-        let (sin_pitch, cos_pitch) = self.pitch_radians.sin_cos();
-        let (sin_yaw, cos_yaw) = self.yaw_radians.sin_cos();
-
-        glam::Mat4::look_to_rh(
-            self.position,
-            glam::Vec3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize(),
-            glam::Vec3::Y,
-        )
-    }
-}
-
-pub struct Projection {
-    aspect_ratio: f32,
-    fov_y_radians: f32,
-    z_near: f32,
-    z_far: f32,
-}
-
-impl Projection {
-    pub fn new(width: u32, height: u32, fov_y_radians: f32, z_near: f32, z_far: f32) -> Self {
-        Self {
-            aspect_ratio: width as f32 / height as f32,
-            fov_y_radians: fov_y_radians.into(),
-            z_near,
-            z_far,
-        }
-    }
-
-    pub fn resize(&mut self, width: u32, height: u32) {
-        self.aspect_ratio = width as f32 / height as f32;
-    }
-
-    pub fn calc_matrix(&self) -> glam::Mat4 {
-        glam::Mat4::perspective_rh(
-            self.fov_y_radians,
-            self.aspect_ratio,
-            self.z_near,
-            self.z_far,
-        )
-    }
-}
 
 #[derive(Debug)]
 pub struct CameraController {
@@ -144,33 +87,32 @@ impl CameraController {
         };
     }
 
-    pub fn update_camera(&mut self, camera: &mut Camera, dt_s: f32) {
+    pub fn update_camera(&mut self, camera_data: &mut CameraData, dt_s: f32) {
         // Move forward/backward and left/right
-        let (yaw_sin, yaw_cos) = camera.yaw_radians.sin_cos();
+        let (yaw_sin, yaw_cos) = camera_data.yaw_radians.sin_cos();
         let forward = glam::vec3(yaw_cos, 0.0, yaw_sin).normalize();
         let right = glam::vec3(-yaw_sin, 0.0, yaw_cos).normalize();
-        camera.position +=
+        camera_data.position +=
             forward * (self.amount_forward - self.amount_backward) * self.speed * dt_s;
-        camera.position += right * (self.amount_right - self.amount_left) * self.speed * dt_s;
+        camera_data.position += right * (self.amount_right - self.amount_left) * self.speed * dt_s;
 
         // Move in/out (aka. "zoom")
         // Note: this isn't an actual zoom. The camera's position
         // changes when zooming. I've added this to make it easier
         // to get closer to an object you want to focus on.
-        let (pitch_sin, pitch_cos) = camera.pitch_radians.sin_cos();
+        let (pitch_sin, pitch_cos) = camera_data.pitch_radians.sin_cos();
         let scrollward =
             glam::vec3(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
-        camera.position += scrollward * self.scroll * self.speed * self.sensitivity * dt_s;
+        camera_data.position += scrollward * self.scroll * self.speed * self.sensitivity * dt_s;
         self.scroll = 0.0;
 
         // Move up/down. Since we don't use roll, we can just
         // modify the y coordinate directly.
-        camera.position.y += (self.amount_up - self.amount_down) * self.speed * dt_s;
+        camera_data.position.y += (self.amount_up - self.amount_down) * self.speed * dt_s;
 
         // Rotate
-        camera.yaw_radians += self.rotate_horizontal * self.sensitivity * dt_s;
-        camera.pitch_radians += -self.rotate_vertical * self.sensitivity * dt_s;
-
+        camera_data.yaw_radians += self.rotate_horizontal * self.sensitivity * dt_s;
+        camera_data.pitch_radians += -self.rotate_vertical * self.sensitivity * dt_s;
         // If process_mouse isn't called every frame, these values
         // will not get set to zero, and the camera will rotate
         // when moving in a non-cardinal direction.
@@ -178,10 +120,10 @@ impl CameraController {
         self.rotate_vertical = 0.0;
 
         // Keep the camera's angle from going too high/low.
-        if camera.pitch_radians < -SAFE_FRAC_PI_2 {
-            camera.pitch_radians = -SAFE_FRAC_PI_2;
-        } else if camera.pitch_radians > SAFE_FRAC_PI_2 {
-            camera.pitch_radians = SAFE_FRAC_PI_2;
+        if camera_data.pitch_radians < -SAFE_FRAC_PI_2 {
+            camera_data.pitch_radians = -SAFE_FRAC_PI_2;
+        } else if camera_data.pitch_radians > SAFE_FRAC_PI_2 {
+            camera_data.pitch_radians = SAFE_FRAC_PI_2;
         }
     }
 }

@@ -3,11 +3,9 @@ use std::io::{BufReader, Cursor};
 use glam::Vec3;
 use rust_embed::Embed;
 
-use wgpu::util::DeviceExt;
-
-use crate::{
-    drawing::textures,
+use crate::drawing::{
     models::{Material, Mesh, Model, ModelVertex},
+    textures,
 };
 
 #[derive(Embed)]
@@ -128,7 +126,7 @@ impl<T: ResLoader> ModelLoader for ObjLoader<T> {
         filename: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        layout: &wgpu::BindGroupLayout,
+        texture_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> anyhow::Result<Model> {
         let obj_text = self.res_loader.load_binary(filename)?;
         let obj_cursor = Cursor::new(obj_text);
@@ -154,7 +152,7 @@ impl<T: ResLoader> ModelLoader for ObjLoader<T> {
                 &m.name,
                 self.load_diffuse_texture(&m.diffuse_texture.unwrap(), device, queue)?,
                 self.load_normal_texture(&m.normal_texture.unwrap(), device, queue)?,
-                layout,
+                texture_bind_group_layout,
             ));
         }
 
@@ -188,36 +186,17 @@ impl<T: ResLoader> ModelLoader for ObjLoader<T> {
 
                 calculate_tangent_and_bitangent(&mut vertices, &m.mesh.indices);
 
-                let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!(
-                        "#{}/{} Vertex Buffer",
-                        self.res_loader.name(),
-                        filename
-                    )),
-                    contents: bytemuck::cast_slice(&vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                });
-                let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!(
-                        "#{}/{} Index Buffer",
-                        self.res_loader.name(),
-                        filename
-                    )),
-                    contents: bytemuck::cast_slice(&m.mesh.indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                });
-
-                Mesh {
-                    name: filename.to_string(),
-                    vertex_buffer,
-                    index_buffer,
-                    num_elements: m.mesh.indices.len() as u32,
-                    material: m.mesh.material_id.unwrap_or(0),
-                }
+                Mesh::new(
+                    device,
+                    &format!("#{}/{}", self.res_loader.name(), filename),
+                    &vertices,
+                    &m.mesh.indices,
+                    m.mesh.material_id.unwrap_or(0),
+                )
             })
             .collect::<Vec<_>>();
 
-        Ok(Model { meshes, materials })
+        Ok(Model::new(meshes, materials))
     }
 }
 
@@ -260,7 +239,7 @@ impl<T: ResLoader> ModelLoader for PmxLoader<T> {
         filename: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
-        layout: &wgpu::BindGroupLayout,
+        texture_bind_group_layout: &wgpu::BindGroupLayout,
     ) -> anyhow::Result<Model> {
         use mmd::pmx::reader::*;
 
@@ -313,7 +292,7 @@ impl<T: ResLoader> ModelLoader for PmxLoader<T> {
                 &m.local_name,
                 diffuse_texture,
                 normal_texture,
-                layout,
+                texture_bind_group_layout,
             ));
 
             let mut global_to_local_vertex_index_map = std::collections::HashMap::new();
@@ -350,34 +329,18 @@ impl<T: ResLoader> ModelLoader for PmxLoader<T> {
 
             calculate_tangent_and_bitangent(&mut vertices, &indices);
 
-            meshes.push(Mesh {
-                name: filename.to_string(),
-                vertex_buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!(
-                        "#{}/{} Vertex Buffer",
-                        self.res_loader.name(),
-                        filename
-                    )),
-                    contents: bytemuck::cast_slice(&vertices),
-                    usage: wgpu::BufferUsages::VERTEX,
-                }),
-                index_buffer: device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!(
-                        "#{}/{} Index Buffer",
-                        self.res_loader.name(),
-                        filename
-                    )),
-                    contents: bytemuck::cast_slice(&indices),
-                    usage: wgpu::BufferUsages::INDEX,
-                }),
-                num_elements: indices.len() as u32,
-                material: m_i,
-            });
+            meshes.push(Mesh::new(
+                device,
+                &format!("#{}/{}", self.res_loader.name(), filename),
+                &vertices,
+                &indices,
+                m_i,
+            ));
 
             triangle_index_offset += triangle_count;
         }
 
-        Ok(Model { meshes, materials })
+        Ok(Model::new(meshes, materials))
     }
 }
 

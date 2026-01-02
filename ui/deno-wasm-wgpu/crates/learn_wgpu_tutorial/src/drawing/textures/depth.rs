@@ -1,11 +1,13 @@
 pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
+#[allow(unused)]
 pub struct DepthTexture {
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     sampler: wgpu::Sampler,
 }
 
+#[allow(unused)]
 impl DepthTexture {
     pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, label: &str) -> Self {
         let size = wgpu::Extent3d {
@@ -59,16 +61,17 @@ impl DepthTexture {
 }
 
 pub struct DepthTextureNonComparisonSampler {
+    #[allow(unused)]
     texture: wgpu::Texture,
     view: wgpu::TextureView,
     sampler: wgpu::Sampler,
 }
 
 impl DepthTextureNonComparisonSampler {
-    pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, label: &str) -> Self {
+    pub fn new(device: &wgpu::Device, size: glam::u32::UVec2, label: &str) -> Self {
         let size = wgpu::Extent3d {
-            width: config.width.max(1),
-            height: config.height.max(1),
+            width: size.x.max(1),
+            height: size.y.max(1),
             depth_or_array_layers: 1,
         };
         let texture = device.create_texture(&wgpu::TextureDescriptor {
@@ -102,9 +105,9 @@ impl DepthTextureNonComparisonSampler {
         }
     }
 
-    pub fn texture(&self) -> &wgpu::Texture {
-        &self.texture
-    }
+    // pub fn texture(&self) -> &wgpu::Texture {
+    //     &self.texture
+    // }
 
     pub fn view(&self) -> &wgpu::TextureView {
         &self.view

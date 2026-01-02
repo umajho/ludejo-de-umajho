@@ -1,16 +1,19 @@
 fn main() {
     let wesl = wesl::Wesl::new("src/drawing/shaders");
 
-    wesl.build_artifact(&"package::render::model".parse().unwrap(), "render_model");
+    wesl.build_artifact(
+        &"package::render::model_demo".parse().unwrap(),
+        "render_model_demo",
+    );
     wesl.build_artifact(
         &"package::render::depth_debug".parse().unwrap(),
         "render_depth_debug",
     );
     wesl.build_artifact(
-        &"package::render::light_source_indicator_model"
+        &"package::render::model_light_source_indicator"
             .parse()
             .unwrap(),
-        "render_light_source_indicator_model",
+        "render_model_light_source_indicator",
     );
     wesl.build_artifact(&"package::render::sky".parse().unwrap(), "render_sky");
     wesl.build_artifact(

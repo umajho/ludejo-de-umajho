@@ -30,9 +30,9 @@ impl D2CanvasHdrTexture {
         &self.0.sampler()
     }
 
-    pub fn size(&self) -> wgpu::Extent3d {
-        self.0.size()
-    }
+    // pub fn size(&self) -> wgpu::Extent3d {
+    //     self.0.size()
+    // }
 }
 
 pub struct NewD2CanvasHdrTextureOptions {

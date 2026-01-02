@@ -23,9 +23,9 @@ impl D2NormalTexture {
         Self(inner)
     }
 
-    pub fn texture(&self) -> &wgpu::Texture {
-        &self.0.texture()
-    }
+    // pub fn texture(&self) -> &wgpu::Texture {
+    //     &self.0.texture()
+    // }
 
     pub fn view(&self) -> &wgpu::TextureView {
         &self.0.view()
@@ -35,7 +35,7 @@ impl D2NormalTexture {
         &self.0.sampler()
     }
 
-    pub fn size(&self) -> wgpu::Extent3d {
-        self.0.size()
-    }
+    // pub fn size(&self) -> wgpu::Extent3d {
+    //     self.0.size()
+    // }
 }

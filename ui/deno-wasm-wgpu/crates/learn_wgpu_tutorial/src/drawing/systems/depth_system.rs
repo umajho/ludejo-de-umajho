@@ -1,45 +1,89 @@
 use wgpu::util::DeviceExt;
 
-use crate::{models::ShapeVertex, textures};
+use crate::{
+    drawing::{models::ShapeVertex, shaders},
+    textures,
+};
+
+pub struct DepthSystem {
+    texture: textures::DepthTextureNonComparisonSampler,
+
+    debug_drawer: DebugDrawer,
+}
+
+impl DepthSystem {
+    pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
+        let texture = Self::make_texture(device, (config.width, config.height).into());
+
+        let debug_drawer = DebugDrawer::new(device, config, &texture);
+
+        Self {
+            texture,
+            debug_drawer,
+        }
+    }
+
+    pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
+        self.texture = Self::make_texture(device, (width, height).into());
+
+        self.debug_drawer.update_bind_group(device, &self.texture);
+    }
+
+    pub fn view(&self) -> &wgpu::TextureView {
+        self.texture.view()
+    }
+
+    pub fn debug_draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
+        self.debug_drawer.draw(view, encoder);
+    }
+
+    fn make_texture(
+        device: &wgpu::Device,
+        size: glam::u32::UVec2,
+    ) -> textures::DepthTextureNonComparisonSampler {
+        textures::DepthTextureNonComparisonSampler::new(device, size, "depth_texture")
+    }
+}
+
+const DEPTH_VERTICES: &[ShapeVertex] = &[
+    ShapeVertex {
+        position: glam::vec3(0.0, 0.0, 0.0),
+        tex_coords: glam::vec2(0.0, 1.0),
+    },
+    ShapeVertex {
+        position: glam::vec3(1.0, 0.0, 0.0),
+        tex_coords: glam::vec2(1.0, 1.0),
+    },
+    ShapeVertex {
+        position: glam::vec3(1.0, 1.0, 0.0),
+        tex_coords: glam::vec2(1.0, 0.0),
+    },
+    ShapeVertex {
+        position: glam::vec3(0.0, 1.0, 0.0),
+        tex_coords: glam::vec2(0.0, 0.0),
+    },
+];
+
+const DEPTH_INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
 
 // https://github.com/sotrh/learn-wgpu/blob/075f2a53b5112f3275aad1746104013e7316c80b/code/beginner/tutorial8-depth/src/challenge.rs#L278
-pub struct DepthPass {
-    pub texture: textures::DepthTextureNonComparisonSampler,
+struct DebugDrawer {
     layout: wgpu::BindGroupLayout,
     bind_group: wgpu::BindGroup,
     vertex_buffer: wgpu::Buffer,
     index_buffer: wgpu::Buffer,
-    num_depth_indices: u32,
+    depth_index_count: u32,
     render_pipeline: wgpu::RenderPipeline,
 }
 
-impl DepthPass {
-    const DEPTH_VERTICES: &[ShapeVertex] = &[
-        ShapeVertex {
-            position: glam::vec3(0.0, 0.0, 0.0),
-            tex_coords: glam::vec2(0.0, 1.0),
-        },
-        ShapeVertex {
-            position: glam::vec3(1.0, 0.0, 0.0),
-            tex_coords: glam::vec2(1.0, 1.0),
-        },
-        ShapeVertex {
-            position: glam::vec3(1.0, 1.0, 0.0),
-            tex_coords: glam::vec2(1.0, 0.0),
-        },
-        ShapeVertex {
-            position: glam::vec3(0.0, 1.0, 0.0),
-            tex_coords: glam::vec2(0.0, 0.0),
-        },
-    ];
-
-    const DEPTH_INDICES: &[u16] = &[0, 1, 2, 0, 2, 3];
-
-    pub fn new(
+impl DebugDrawer {
+    fn new(
         device: &wgpu::Device,
         config: &wgpu::SurfaceConfiguration,
-        shader: &super::drawing::shaders::RenderShader,
+        texture: &textures::DepthTextureNonComparisonSampler,
     ) -> Self {
+        let shader = shaders::r_depth_debug(&device);
+
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("Depth Pass Layout"),
             entries: &[
@@ -62,16 +106,16 @@ impl DepthPass {
             ],
         });
 
-        let (texture, bind_group) = Self::make_texture_and_bind_group(device, &layout, config);
+        let bind_group = Self::make_bind_group(device, &layout, texture);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Depth Pass VB"),
-            contents: bytemuck::cast_slice(Self::DEPTH_VERTICES),
+            contents: bytemuck::cast_slice(DEPTH_VERTICES),
             usage: wgpu::BufferUsages::VERTEX,
         });
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Depth Pass IB"),
-            contents: bytemuck::cast_slice(Self::DEPTH_INDICES),
+            contents: bytemuck::cast_slice(DEPTH_INDICES),
             usage: wgpu::BufferUsages::INDEX,
         });
 
@@ -84,11 +128,11 @@ impl DepthPass {
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Depth Pass Render Pipeline"),
             layout: Some(&pipeline_layout),
-            vertex: shader.vertex_state(super::drawing::shaders::VertexStatePartial {
+            vertex: shader.vertex_state(shaders::VertexStatePartial {
                 buffers: &[ShapeVertex::desc()],
                 compilation_options: wgpu::PipelineCompilationOptions::default(),
             }),
-            fragment: shader.fragment_state(super::drawing::shaders::FragmentStatePartial {
+            fragment: shader.fragment_state(shaders::FragmentStatePartial {
                 targets: &[Some(wgpu::ColorTargetState {
                     format: config.format,
                     blend: Some(wgpu::BlendState {
@@ -125,30 +169,21 @@ impl DepthPass {
         });
 
         Self {
-            texture,
             layout,
             bind_group,
             vertex_buffer,
             index_buffer,
-            num_depth_indices: Self::DEPTH_INDICES.len() as u32,
+            depth_index_count: DEPTH_INDICES.len() as u32,
             render_pipeline,
         }
     }
 
-    pub fn resize(&mut self, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) {
-        (self.texture, self.bind_group) =
-            Self::make_texture_and_bind_group(device, &self.layout, config);
-    }
-
-    fn make_texture_and_bind_group(
+    fn update_bind_group(
+        &mut self,
         device: &wgpu::Device,
-        layout: &wgpu::BindGroupLayout,
-        config: &wgpu::SurfaceConfiguration,
-    ) -> (textures::DepthTextureNonComparisonSampler, wgpu::BindGroup) {
-        let texture =
-            textures::DepthTextureNonComparisonSampler::new(device, config, "depth_texture");
-        let bind_group = Self::make_bind_group(device, layout, &texture);
-        (texture, bind_group)
+        texture: &textures::DepthTextureNonComparisonSampler,
+    ) {
+        self.bind_group = Self::make_bind_group(device, &self.layout, &texture);
     }
 
     fn make_bind_group(
@@ -173,7 +208,7 @@ impl DepthPass {
     }
 
     #[allow(unused)]
-    pub fn render(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
+    fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("Depth Visual Render Pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -193,6 +228,6 @@ impl DepthPass {
         render_pass.set_bind_group(0, &self.bind_group, &[]);
         render_pass.set_vertex_buffer(0, self.vertex_buffer.slice(..));
         render_pass.set_index_buffer(self.index_buffer.slice(..), wgpu::IndexFormat::Uint16);
-        render_pass.draw_indexed(0..self.num_depth_indices, 0, 0..1);
+        render_pass.draw_indexed(0..self.depth_index_count, 0, 0..1);
     }
 }
