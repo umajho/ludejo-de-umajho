@@ -59,6 +59,7 @@ pub enum ElementState {
 }
 
 /// corresponds to [`winit::event::MouseScrollDelta`].
+#[allow(unused)]
 pub enum MouseScrollDelta {
     LineDelta(f32, f32),
     PixelDelta((f64, f64)),
