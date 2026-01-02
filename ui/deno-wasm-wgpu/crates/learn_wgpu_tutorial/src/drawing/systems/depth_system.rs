@@ -134,7 +134,7 @@ impl DebugDrawer {
             }),
             fragment: shader.fragment_state(shaders::FragmentStatePartial {
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format,
+                    format: config.format.add_srgb_suffix(),
                     blend: Some(wgpu::BlendState {
                         color: wgpu::BlendComponent::REPLACE,
                         alpha: wgpu::BlendComponent::REPLACE,
