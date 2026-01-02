@@ -16,7 +16,7 @@ use crate::io::window_handling::{
     ApplicationContext, ElementState, Input, KeyCode, MouseButton, MouseScrollDelta, PhysicalKey,
 };
 
-pub struct NativeWinitWindowHandler {
+pub struct WinitWindowHandler {
     #[cfg(target_arch = "wasm32")]
     proxy: Option<winit::event_loop::EventLoopProxy<UserEvent>>,
 
@@ -46,7 +46,7 @@ enum State {
     Ready(InnerHandler),
 }
 
-impl NativeWinitWindowHandler {
+impl WinitWindowHandler {
     pub fn new(
         init: Init,
         #[cfg(target_arch = "wasm32")] event_loop: &EventLoop<UserEvent>,
@@ -61,7 +61,7 @@ impl NativeWinitWindowHandler {
     }
 }
 
-impl ApplicationHandler<UserEvent> for NativeWinitWindowHandler {
+impl ApplicationHandler<UserEvent> for WinitWindowHandler {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let State::Uninitialized(init) = &mut self.state else {
             return;
@@ -93,7 +93,7 @@ impl ApplicationHandler<UserEvent> for NativeWinitWindowHandler {
         let size = window.inner_size();
         let size = (size.width, size.height).into();
 
-        let ctx = Box::new(NativeWinitApplicationContext {
+        let ctx = Box::new(WinitApplicationContext {
             window: window.clone(),
         });
 
@@ -211,11 +211,11 @@ impl ApplicationHandler<UserEvent> for NativeWinitWindowHandler {
     }
 }
 
-struct NativeWinitApplicationContext {
+struct WinitApplicationContext {
     window: Arc<Window>,
 }
 
-impl ApplicationContext for NativeWinitApplicationContext {
+impl ApplicationContext for WinitApplicationContext {
     fn request_redraw(&self) {
         self.window.request_redraw();
     }

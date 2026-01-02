@@ -12,9 +12,7 @@ mod utils;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use crate::{
-    app::App, drawing::textures, io::window_handling::native_winit::NativeWinitWindowHandler,
-};
+use crate::{app::App, drawing::textures, io::window_handling::winit::WinitWindowHandler};
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
@@ -28,7 +26,7 @@ pub fn run() -> anyhow::Result<()> {
 
     let event_loop = winit::event_loop::EventLoop::with_user_event().build()?;
 
-    let mut handler = NativeWinitWindowHandler::new(
+    let mut handler = WinitWindowHandler::new(
         Box::new(|surface_target, ctx, size| {
             Box::pin(App::try_new_as_boxed_handler(surface_target, ctx, size))
         }),

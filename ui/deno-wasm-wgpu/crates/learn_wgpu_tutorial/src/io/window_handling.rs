@@ -1,4 +1,4 @@
-pub mod native_winit;
+pub mod winit;
 
 pub trait SimpleApplicationEventHandler {
     #[must_use]
