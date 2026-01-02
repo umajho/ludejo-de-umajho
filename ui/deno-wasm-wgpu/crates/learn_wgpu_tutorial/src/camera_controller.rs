@@ -20,6 +20,8 @@ pub struct CameraController {
     scroll: f32,
     speed: f32,
     sensitivity: f32,
+
+    mouse_pressed: bool,
 }
 
 impl CameraController {
@@ -36,6 +38,7 @@ impl CameraController {
             scroll: 0.0,
             speed,
             sensitivity,
+            mouse_pressed: false,
         }
     }
 
@@ -75,8 +78,10 @@ impl CameraController {
     }
 
     pub fn handle_mouse(&mut self, mouse_dx: f64, mouse_dy: f64) {
-        self.rotate_horizontal = mouse_dx as f32;
-        self.rotate_vertical = mouse_dy as f32;
+        if self.mouse_pressed {
+            self.rotate_horizontal = mouse_dx as f32;
+            self.rotate_vertical = mouse_dy as f32;
+        }
     }
 
     pub fn handle_mouse_scroll(&mut self, delta: &MouseScrollDelta) {
@@ -85,6 +90,12 @@ impl CameraController {
             MouseScrollDelta::LineDelta(_, scroll) => scroll * 100.0,
             MouseScrollDelta::PixelDelta(PhysicalPosition { y: scroll, .. }) => *scroll as f32,
         };
+    }
+
+    pub fn handle_mouse_input(&mut self, button: &MouseButton, state: &ElementState) {
+        if button == &MouseButton::Left {
+            self.mouse_pressed = state == &ElementState::Pressed;
+        }
     }
 
     pub fn update_camera(&mut self, camera_data: &mut CameraData, dt_s: f32) {

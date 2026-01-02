@@ -11,7 +11,7 @@ use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use winit::event::{DeviceEvent, ElementState, MouseButton};
+use winit::event::{DeviceEvent, ElementState};
 use winit::event_loop::EventLoop;
 use winit::{
     application::ApplicationHandler,
@@ -74,8 +74,6 @@ pub struct State {
     skybox_sys: SkyboxSystem,
 
     camera_controller: camera_controller::CameraController,
-
-    mouse_pressed: bool,
 
     window: Arc<Window>,
 
@@ -194,8 +192,6 @@ impl State {
 
             camera_controller,
 
-            mouse_pressed: false,
-
             update_time_ms: utils::now_ms(),
 
             window,
@@ -310,12 +306,8 @@ impl State {
                 self.camera_controller.handle_mouse_scroll(delta);
                 true
             }
-            WindowEvent::MouseInput {
-                button: MouseButton::Left,
-                state,
-                ..
-            } => {
-                self.mouse_pressed = *state == ElementState::Pressed;
+            WindowEvent::MouseInput { button, state, .. } => {
+                self.camera_controller.handle_mouse_input(button, state);
                 true
             }
             _ => false,
@@ -413,9 +405,7 @@ impl ApplicationHandler<State> for App {
 
         match event {
             DeviceEvent::MouseMotion { delta } => {
-                if state.mouse_pressed {
-                    state.camera_controller.handle_mouse(delta.0, delta.1);
-                }
+                state.camera_controller.handle_mouse(delta.0, delta.1);
             }
             _ => {}
         }
