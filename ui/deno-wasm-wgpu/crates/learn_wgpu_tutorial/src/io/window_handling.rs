@@ -8,7 +8,12 @@ pub trait SimpleApplicationEventHandler {
     fn handle_resized(&mut self, size: (u32, u32));
 
     /// corresponds to [`winit::event::WindowEvent::RedrawRequested`].
-    fn handle_redraw_requested(&mut self, get_window_size: Option<Box<dyn FnOnce() -> (u32, u32)>>);
+    fn handle_redraw_requested(&mut self);
+}
+
+pub trait ApplicationContext {
+    fn request_redraw(&self);
+    fn window_size(&self) -> (u32, u32);
 }
 
 pub enum Input {

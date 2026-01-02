@@ -13,7 +13,7 @@ use winit::{
 };
 
 use crate::io::window_handling::{
-    ElementState, Input, KeyCode, MouseButton, MouseScrollDelta, PhysicalKey,
+    ApplicationContext, ElementState, Input, KeyCode, MouseButton, MouseScrollDelta, PhysicalKey,
 };
 
 pub struct NativeWinitWindowHandler {
@@ -26,9 +26,9 @@ pub struct NativeWinitWindowHandler {
 
 type Init = Box<
     dyn FnOnce(
-        wgpu::SurfaceTarget<'static>, // surface_target
-        Box<dyn Fn() + 'static>,      // request_redraw
-        glam::UVec2,                  // size
+        wgpu::SurfaceTarget<'static>,          // surface_target
+        Box<dyn ApplicationContext + 'static>, // ctx
+        glam::UVec2,                           // size
     ) -> Pin<
         Box<dyn std::future::Future<Output = anyhow::Result<InnerHandler>> + 'static>,
     >,
@@ -90,25 +90,25 @@ impl ApplicationHandler<UserEvent> for NativeWinitWindowHandler {
 
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
         self.window = Some(window.clone());
-        let request_redraw = {
-            let window = window.clone();
-            Box::new(move || window.request_redraw())
-        };
         let size = window.inner_size();
         let size = (size.width, size.height).into();
+
+        let ctx = Box::new(NativeWinitApplicationContext {
+            window: window.clone(),
+        });
 
         cfg_select! {
           target_arch = "wasm32" => {
             if let Some(proxy) = self.proxy.take() {
                 wasm_bindgen_futures::spawn_local(async move {
-                    let inner_handler = (init)(window.clone().into(), request_redraw, size).await;
+                    let inner_handler = (init)(window.clone().into(), ctx, size).await;
                     let inner_handler = inner_handler.unwrap();
                     assert!(proxy.send_event(UserEvent { inner_handler, window }).is_ok())
                 })
             }
           }
           _ => {
-            let inner_handler_future = (init)(window.into(), request_redraw, size);
+            let inner_handler_future = (init)(window.into(), ctx, size);
             self.state = State::Ready(pollster::block_on(inner_handler_future).unwrap());
           }
         }
@@ -116,7 +116,7 @@ impl ApplicationHandler<UserEvent> for NativeWinitWindowHandler {
 
     #[cfg(target_arch = "wasm32")]
     fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut user_event: UserEvent) {
-        user_event.inner_handler.handle_redraw_requested(None);
+        user_event.inner_handler.handle_redraw_requested();
         let size = user_event.window.inner_size();
         user_event
             .inner_handler
@@ -204,14 +204,25 @@ impl ApplicationHandler<UserEvent> for NativeWinitWindowHandler {
                 inner_handler.handle_resized((size.width, size.height));
             }
             WindowEvent::RedrawRequested => {
-                let window = window.clone();
-                inner_handler.handle_redraw_requested(Some(Box::new(move || {
-                    let size = window.inner_size();
-                    (size.width, size.height)
-                })));
+                inner_handler.handle_redraw_requested();
             }
             _ => {}
         }
+    }
+}
+
+struct NativeWinitApplicationContext {
+    window: Arc<Window>,
+}
+
+impl ApplicationContext for NativeWinitApplicationContext {
+    fn request_redraw(&self) {
+        self.window.request_redraw();
+    }
+
+    fn window_size(&self) -> (u32, u32) {
+        let size = self.window.inner_size();
+        (size.width, size.height)
     }
 }
 

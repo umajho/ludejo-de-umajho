@@ -29,12 +29,8 @@ pub fn run() -> anyhow::Result<()> {
     let event_loop = winit::event_loop::EventLoop::with_user_event().build()?;
 
     let mut handler = NativeWinitWindowHandler::new(
-        Box::new(|surface_target, request_redraw, size| {
-            Box::pin(App::try_new_as_boxed_handler(
-                surface_target,
-                request_redraw,
-                size,
-            ))
+        Box::new(|surface_target, ctx, size| {
+            Box::pin(App::try_new_as_boxed_handler(surface_target, ctx, size))
         }),
         #[cfg(target_arch = "wasm32")]
         &event_loop,

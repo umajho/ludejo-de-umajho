@@ -19,14 +19,14 @@ use crate::{
     embedded_demo_resources,
     io::{
         fs_accessors::{FsAccessor, embed_fs_accessor::EmbedFsAccessor},
-        window_handling::{Input, PhysicalKey, SimpleApplicationEventHandler},
+        window_handling::{ApplicationContext, Input, PhysicalKey, SimpleApplicationEventHandler},
     },
     model_loaders::{ModelLoader, obj_loader::ObjLoader, pmx_loader::PmxLoader},
     utils,
 };
 
 pub struct App {
-    request_redraw: Box<dyn Fn() + 'static>,
+    ctx: Box<dyn ApplicationContext>,
 
     device: wgpu::Device,
     queue: wgpu::Queue,
@@ -46,17 +46,15 @@ pub struct App {
 impl App {
     pub async fn try_new_as_boxed_handler(
         surface_target: wgpu::SurfaceTarget<'static>,
-        request_redraw: Box<dyn Fn() + 'static>,
+        ctx: Box<dyn ApplicationContext>,
         size: glam::UVec2,
     ) -> anyhow::Result<Box<dyn SimpleApplicationEventHandler>> {
-        Ok(Box::new(
-            Self::try_new(surface_target, request_redraw, size).await?,
-        ))
+        Ok(Box::new(Self::try_new(surface_target, ctx, size).await?))
     }
 
     pub async fn try_new(
         surface_target: wgpu::SurfaceTarget<'static>,
-        request_redraw: Box<dyn Fn() + 'static>,
+        ctx: Box<dyn ApplicationContext>,
         size: glam::UVec2,
     ) -> anyhow::Result<Self> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
@@ -154,7 +152,7 @@ impl App {
         ));
 
         Ok(Self {
-            request_redraw,
+            ctx,
 
             device,
             queue,
@@ -202,7 +200,7 @@ impl App {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        (self.request_redraw)();
+        self.ctx.request_redraw();
 
         if !self.canvas_sys.is_ready() {
             return Ok(());
@@ -293,20 +291,13 @@ impl SimpleApplicationEventHandler for App {
         self.resize(width, height);
     }
 
-    fn handle_redraw_requested(
-        &mut self,
-        get_window_size: Option<Box<dyn FnOnce() -> (u32, u32)>>,
-    ) {
+    fn handle_redraw_requested(&mut self) {
         self.update();
 
         match self.render() {
             Ok(_) => {}
             Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                let Some(get_window_size) = get_window_size else {
-                    todo!();
-                };
-
-                let size = (get_window_size)();
+                let size = self.ctx.window_size();
                 self.resize(size.0, size.1);
             }
             Err(e) => {
