@@ -13,31 +13,32 @@ use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use winit::event::{DeviceEvent, ElementState};
-use winit::event_loop::EventLoop;
 use winit::{
     application::ApplicationHandler,
-    event::{KeyEvent, WindowEvent},
-    event_loop::ActiveEventLoop,
+    event::{DeviceEvent, ElementState, KeyEvent, WindowEvent},
+    event_loop::{ActiveEventLoop, EventLoop},
     keyboard::{KeyCode, PhysicalKey},
     window::Window,
 };
 
-use crate::drawing::systems::camera_system::CameraSystem;
-use crate::drawing::systems::canvas_system::CanvasSystem;
-use crate::drawing::systems::depth_system::DepthSystem;
-use crate::drawing::systems::light_system::LightSystem;
-use crate::drawing::systems::model_system::instances_providers::demo_simple_instances_provider::DemoSimpleInstancesProvider;
-use crate::drawing::systems::model_system::{
-    ModelEntryLightSourceIndicator, ModelEntrySimple, ModelSystem,
+use crate::{
+    drawing::{
+        systems::{
+            camera_system::CameraSystem,
+            canvas_system::CanvasSystem,
+            depth_system::DepthSystem,
+            light_system::LightSystem,
+            model_system::{
+                ModelEntryLightSourceIndicator, ModelEntrySimple, ModelSystem,
+                instances_providers::demo_simple_instances_provider::DemoSimpleInstancesProvider,
+            },
+            skybox_system::SkyboxSystem,
+        },
+        textures,
+    },
+    io::fs_accessors::{FsAccessor, embed_fs_accessor::EmbedFsAccessor},
+    model_loaders::{ModelLoader, obj_loader::ObjLoader, pmx_loader::PmxLoader},
 };
-use crate::drawing::systems::skybox_system::SkyboxSystem;
-use crate::drawing::textures;
-use crate::io::fs_accessors::FsAccessor;
-use crate::io::fs_accessors::embed_fs_accessor::EmbedFsAccessor;
-use crate::model_loaders::ModelLoader;
-use crate::model_loaders::obj_loader::ObjLoader;
-use crate::model_loaders::pmx_loader::PmxLoader;
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
