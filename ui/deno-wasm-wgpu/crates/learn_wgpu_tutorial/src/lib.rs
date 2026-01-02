@@ -13,14 +13,6 @@ use std::sync::Arc;
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
-use winit::{
-    application::ApplicationHandler,
-    event::{DeviceEvent, ElementState, KeyEvent, WindowEvent},
-    event_loop::{ActiveEventLoop, EventLoop},
-    keyboard::{KeyCode, PhysicalKey},
-    window::Window,
-};
-
 use crate::{
     drawing::{
         systems::{
@@ -36,7 +28,13 @@ use crate::{
         },
         textures,
     },
-    io::fs_accessors::{FsAccessor, embed_fs_accessor::EmbedFsAccessor},
+    io::{
+        fs_accessors::{FsAccessor, embed_fs_accessor::EmbedFsAccessor},
+        window_handling::{
+            Input, PhysicalKey, SimpleApplicationEventHandler,
+            native_winit::NativeWinitWindowHandler,
+        },
+    },
     model_loaders::{ModelLoader, obj_loader::ObjLoader, pmx_loader::PmxLoader},
 };
 
@@ -50,12 +48,21 @@ pub fn run() -> anyhow::Result<()> {
         }
     }
 
-    let event_loop = EventLoop::with_user_event().build()?;
-    let mut app = cfg_select! {
-        target_arch = "wasm32" => { App::new(&event_loop) }
-        _ => { App::new() }
-    };
-    event_loop.run_app(&mut app)?;
+    let event_loop = winit::event_loop::EventLoop::with_user_event().build()?;
+
+    let mut handler = NativeWinitWindowHandler::new(
+        Box::new(|surface_target, request_redraw, size| {
+            Box::pin(State::try_new_as_boxed_handler(
+                surface_target,
+                request_redraw,
+                size,
+            ))
+        }),
+        #[cfg(target_arch = "wasm32")]
+        &event_loop,
+    );
+
+    event_loop.run_app(&mut handler)?;
 
     Ok(())
 }
@@ -70,6 +77,8 @@ pub fn run_web() -> Result<(), wasm_bindgen::JsValue> {
 }
 
 pub struct State {
+    request_redraw: Box<dyn Fn() + 'static>,
+
     device: wgpu::Device,
     queue: wgpu::Queue,
 
@@ -82,21 +91,31 @@ pub struct State {
 
     camera_controller: camera_controller::CameraController,
 
-    window: Arc<Window>,
-
     update_time_ms: u64,
 }
 
 impl State {
-    pub async fn try_new(window: Arc<Window>) -> anyhow::Result<Self> {
-        let size = window.inner_size();
+    pub async fn try_new_as_boxed_handler(
+        surface_target: wgpu::SurfaceTarget<'static>,
+        request_redraw: Box<dyn Fn() + 'static>,
+        size: glam::UVec2,
+    ) -> anyhow::Result<Box<dyn SimpleApplicationEventHandler>> {
+        Ok(Box::new(
+            Self::try_new(surface_target, request_redraw, size).await?,
+        ))
+    }
 
+    pub async fn try_new(
+        surface_target: wgpu::SurfaceTarget<'static>,
+        request_redraw: Box<dyn Fn() + 'static>,
+        size: glam::UVec2,
+    ) -> anyhow::Result<Self> {
         let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
             backends: wgpu::Backends::PRIMARY,
             ..Default::default()
         });
 
-        let surface = instance.create_surface(window.clone()).unwrap();
+        let surface = instance.create_surface(surface_target).unwrap();
 
         let adapter = instance
             .request_adapter(&wgpu::RequestAdapterOptions {
@@ -117,13 +136,12 @@ impl State {
             })
             .await?;
 
-        let canvas_sys =
-            CanvasSystem::new(surface, &adapter, &device, (size.width, size.height).into());
+        let canvas_sys = CanvasSystem::new(surface, &adapter, &device, size);
 
         let texture_bind_group_layout =
             textures::make_regular_d2_texture_bind_group_layout(&device);
 
-        let camera_sys = CameraSystem::new(&device, (size.width, size.height).into());
+        let camera_sys = CameraSystem::new(&device, size);
         let camera_controller = camera_controller::CameraController::new(4.0, 0.4);
 
         let light_sys = LightSystem::new(&device);
@@ -187,6 +205,8 @@ impl State {
         ));
 
         Ok(Self {
+            request_redraw,
+
             device,
             queue,
 
@@ -200,8 +220,6 @@ impl State {
             camera_controller,
 
             update_time_ms: utils::now_ms(),
-
-            window,
         })
     }
 
@@ -235,7 +253,7 @@ impl State {
     }
 
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
-        self.window.request_redraw();
+        (self.request_redraw)();
 
         if !self.canvas_sys.is_ready() {
             return Ok(());
@@ -297,175 +315,54 @@ impl State {
 
         Ok(())
     }
+}
 
-    fn input(&mut self, event: &WindowEvent) -> bool {
-        match event {
-            WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        physical_key: PhysicalKey::Code(key),
-                        state,
-                        ..
-                    },
-                ..
-            } => self.camera_controller.process_keyboard(*key, *state),
-            WindowEvent::MouseWheel { delta, .. } => {
-                self.camera_controller.handle_mouse_scroll(delta);
+impl SimpleApplicationEventHandler for State {
+    fn handle_input(&mut self, input: Input) -> bool {
+        match input {
+            Input::MouseMotion { delta } => {
+                self.camera_controller.handle_mouse(delta.0, delta.1);
                 true
             }
-            WindowEvent::MouseInput { button, state, .. } => {
+            Input::KeyboardInput {
+                physical_key: PhysicalKey::Code(key),
+                state,
+            } => self.camera_controller.process_keyboard(key, state),
+            Input::MouseWheel { delta } => {
+                self.camera_controller.handle_mouse_scroll(&delta);
+                true
+            }
+            Input::MouseInput { button, state } => {
                 self.camera_controller.handle_mouse_input(button, state);
                 true
             }
             _ => false,
         }
     }
-}
 
-pub struct App {
-    #[cfg(target_arch = "wasm32")]
-    proxy: Option<winit::event_loop::EventLoopProxy<State>>,
-    state: Option<State>,
-}
-
-impl App {
-    #[cfg(target_arch = "wasm32")]
-    pub fn new(event_loop: &EventLoop<State>) -> Self {
-        Self {
-            proxy: Some(event_loop.create_proxy()),
-            state: None,
-        }
+    fn handle_resized(&mut self, (width, height): (u32, u32)) {
+        self.resize(width, height);
     }
 
-    #[cfg(not(target_arch = "wasm32"))]
-    pub fn new() -> Self {
-        Self { state: None }
-    }
-}
-
-impl ApplicationHandler<State> for App {
-    fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        #[allow(unused_mut)]
-        let mut window_attributes = winit::window::WindowAttributes::default();
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            use wasm_bindgen::JsCast;
-            use winit::platform::web::WindowAttributesExtWebSys;
-
-            const CANVAS_ID: &str = "canvas";
-
-            let window = wgpu::web_sys::window().unwrap_throw();
-            let document = window.document().unwrap_throw();
-            let canvas = document.get_element_by_id(CANVAS_ID).unwrap_throw();
-            let html_canvas_element = canvas.unchecked_into();
-            window_attributes = window_attributes.with_canvas(Some(html_canvas_element));
-        }
-
-        let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
-
-        cfg_select! {
-          target_arch = "wasm32" => {
-            if let Some(proxy) = self.proxy.take() {
-                wasm_bindgen_futures::spawn_local(async move {
-                    assert!(
-                        proxy
-                            .send_event(
-                                State::try_new(window)
-                                    .await
-                                    .expect("Unabled to create canvas!!!")
-                            )
-                            .is_ok()
-                    )
-                })
-            }
-          }
-          _ => {
-            self.state = Some(pollster::block_on(State::try_new(window)).unwrap());
-          }
-        }
-    }
-
-    #[allow(unused_mut)]
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut event: State) {
-        #[cfg(target_arch = "wasm32")]
-        {
-            event.window.request_redraw();
-            event.resize(
-                event.window.inner_size().width,
-                event.window.inner_size().height,
-            );
-        }
-        self.state = Some(event);
-    }
-
-    fn device_event(
+    fn handle_redraw_requested(
         &mut self,
-        _event_loop: &ActiveEventLoop,
-        _device_id: winit::event::DeviceId,
-        event: winit::event::DeviceEvent,
+        get_window_size: Option<Box<dyn FnOnce() -> (u32, u32)>>,
     ) {
-        let state = match &mut self.state {
-            Some(state) => state,
-            None => return,
-        };
+        self.update();
 
-        match event {
-            DeviceEvent::MouseMotion { delta } => {
-                state.camera_controller.handle_mouse(delta.0, delta.1);
+        match self.render() {
+            Ok(_) => {}
+            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                let Some(get_window_size) = get_window_size else {
+                    todo!();
+                };
+
+                let size = (get_window_size)();
+                self.resize(size.0, size.1);
             }
-            _ => {}
-        }
-    }
-
-    fn window_event(
-        &mut self,
-        event_loop: &ActiveEventLoop,
-        window_id: winit::window::WindowId,
-        event: WindowEvent,
-    ) {
-        let state = match &mut self.state {
-            Some(state) => state,
-            None => return,
-        };
-
-        if window_id != state.window.id() {
-            return;
-        }
-
-        if state.input(&event) {
-            return;
-        }
-
-        match event {
-            WindowEvent::CloseRequested
-            | WindowEvent::KeyboardInput {
-                event:
-                    KeyEvent {
-                        physical_key: PhysicalKey::Code(KeyCode::Escape),
-                        state: ElementState::Pressed,
-                        ..
-                    },
-                ..
-            } => {
-                event_loop.exit();
+            Err(e) => {
+                log::error!("Unable to render {}", e)
             }
-            WindowEvent::Resized(size) => state.resize(size.width, size.height),
-            WindowEvent::RedrawRequested => {
-                state.update();
-
-                match state.render() {
-                    Ok(_) => {}
-                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
-                        let size = state.window.inner_size();
-                        state.resize(size.width, size.height);
-                    }
-                    Err(e) => {
-                        log::error!("Unable to render {}", e)
-                    }
-                }
-            }
-            _ => {}
         }
     }
 }

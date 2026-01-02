@@ -1,9 +1,9 @@
 use std::f32::consts::FRAC_PI_2;
-use winit::dpi::PhysicalPosition;
-use winit::event::*;
-use winit::keyboard::KeyCode;
 
-use crate::drawing::systems::camera_system::CameraData;
+use crate::{
+    drawing::systems::camera_system::CameraData,
+    io::window_handling::{ElementState, KeyCode, MouseButton, MouseScrollDelta},
+};
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
@@ -88,13 +88,13 @@ impl CameraController {
         self.scroll = -match delta {
             // I'm assuming a line is about 100 pixels
             MouseScrollDelta::LineDelta(_, scroll) => scroll * 100.0,
-            MouseScrollDelta::PixelDelta(PhysicalPosition { y: scroll, .. }) => *scroll as f32,
+            MouseScrollDelta::PixelDelta((_, scroll)) => *scroll as f32,
         };
     }
 
-    pub fn handle_mouse_input(&mut self, button: &MouseButton, state: &ElementState) {
-        if button == &MouseButton::Left {
-            self.mouse_pressed = state == &ElementState::Pressed;
+    pub fn handle_mouse_input(&mut self, button: MouseButton, state: ElementState) {
+        if button == MouseButton::Left {
+            self.mouse_pressed = state == ElementState::Pressed;
         }
     }
 
