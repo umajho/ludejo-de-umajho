@@ -139,7 +139,7 @@ impl<T: super::TextureFormat> D2Texture<T> {
 pub(super) struct NewD2TextureOptions {
     pub is_color_map: bool,
 
-    pub size: glam::u32::UVec2,
+    pub size: glam::UVec2,
     pub usage: wgpu::TextureUsages,
 
     pub mag_filter: wgpu::FilterMode,

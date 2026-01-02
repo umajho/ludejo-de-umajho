@@ -114,7 +114,7 @@ impl CubeTexture<TheTextureFormat> {
 }
 
 struct NewCubeTextureOptions {
-    size: glam::u32::UVec2,
+    size: glam::UVec2,
     usage: wgpu::TextureUsages,
 }
 

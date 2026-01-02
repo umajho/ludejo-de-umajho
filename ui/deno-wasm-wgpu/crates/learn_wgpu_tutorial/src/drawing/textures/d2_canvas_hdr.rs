@@ -36,5 +36,5 @@ impl D2CanvasHdrTexture {
 }
 
 pub struct NewD2CanvasHdrTextureOptions {
-    pub size: glam::u32::UVec2,
+    pub size: glam::UVec2,
 }

@@ -15,7 +15,7 @@ impl CanvasSystem {
         surface: wgpu::Surface<'static>,
         adapter: &wgpu::Adapter,
         device: &wgpu::Device,
-        size: glam::u32::UVec2,
+        size: glam::UVec2,
     ) -> Self {
         let surface_caps = surface.get_capabilities(adapter);
         let surface_format = surface_caps
@@ -127,7 +127,7 @@ impl HdrToneMappingCanvas {
         let (texture, bind_group) = Self::make_texture_and_bind_group(
             device,
             &layout,
-            glam::u32::UVec2::new(config.width.max(1), config.height.max(1)),
+            glam::UVec2::new(config.width.max(1), config.height.max(1)),
         );
 
         debug_assert_eq!(texture.texture().format(), CANVAS_COLOR_FORMAT);
@@ -161,14 +161,14 @@ impl HdrToneMappingCanvas {
         (self.texture, self.bind_group) = Self::make_texture_and_bind_group(
             device,
             &self.layout,
-            glam::u32::UVec2::new(width, height),
+            glam::UVec2::new(width, height),
         );
     }
 
     fn make_texture_and_bind_group(
         device: &wgpu::Device,
         layout: &wgpu::BindGroupLayout,
-        size: glam::u32::UVec2,
+        size: glam::UVec2,
     ) -> (textures::D2CanvasHdrTexture, wgpu::BindGroup) {
         let texture = textures::D2CanvasHdrTexture::new(
             device,

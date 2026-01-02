@@ -68,7 +68,7 @@ pub struct DepthTextureNonComparisonSampler {
 }
 
 impl DepthTextureNonComparisonSampler {
-    pub fn new(device: &wgpu::Device, size: glam::u32::UVec2, label: &str) -> Self {
+    pub fn new(device: &wgpu::Device, size: glam::UVec2, label: &str) -> Self {
         let size = wgpu::Extent3d {
             width: size.x.max(1),
             height: size.y.max(1),

@@ -40,7 +40,7 @@ impl DepthSystem {
 
     fn make_texture(
         device: &wgpu::Device,
-        size: glam::u32::UVec2,
+        size: glam::UVec2,
     ) -> textures::DepthTextureNonComparisonSampler {
         textures::DepthTextureNonComparisonSampler::new(device, size, "depth_texture")
     }

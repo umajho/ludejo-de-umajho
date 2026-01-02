@@ -7,7 +7,7 @@ pub struct CameraSystem {
 }
 
 impl CameraSystem {
-    pub fn new(device: &wgpu::Device, size: glam::u32::UVec2) -> Self {
+    pub fn new(device: &wgpu::Device, size: glam::UVec2) -> Self {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
@@ -58,7 +58,7 @@ pub struct CameraEntry {
 impl CameraEntry {
     fn new(
         device: &wgpu::Device,
-        size: glam::u32::UVec2,
+        size: glam::UVec2,
         bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
         let camera = Camera::new(CameraData {
@@ -187,7 +187,7 @@ struct Projection {
 }
 
 impl Projection {
-    fn new(size: glam::u32::UVec2, fov_y_radians: f32, z_near: f32, z_far: f32) -> Self {
+    fn new(size: glam::UVec2, fov_y_radians: f32, z_near: f32, z_far: f32) -> Self {
         let aspect_ratio = size.x as f32 / size.y as f32;
 
         Self {
