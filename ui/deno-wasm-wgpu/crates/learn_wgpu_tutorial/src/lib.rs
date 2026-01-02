@@ -3,7 +3,9 @@
 
 mod camera_controller;
 mod drawing;
-mod resources;
+mod embedded_demo_resources;
+mod io;
+mod model_loaders;
 mod utils;
 
 use std::sync::Arc;
@@ -31,7 +33,11 @@ use crate::drawing::systems::model_system::{
 };
 use crate::drawing::systems::skybox_system::SkyboxSystem;
 use crate::drawing::textures;
-use crate::resources::{ModelLoader, ResLoader};
+use crate::io::fs_accessors::FsAccessor;
+use crate::io::fs_accessors::embed_fs_accessor::EmbedFsAccessor;
+use crate::model_loaders::ModelLoader;
+use crate::model_loaders::obj_loader::ObjLoader;
+use crate::model_loaders::pmx_loader::PmxLoader;
 
 pub fn run() -> anyhow::Result<()> {
     cfg_select! {
@@ -121,7 +127,7 @@ impl State {
 
         let light_sys = LightSystem::new(&device);
 
-        let sky_res_loader = resources::EmbedResLoader::<resources::ResSky>::new("sky");
+        let sky_res_loader = EmbedFsAccessor::<embedded_demo_resources::ResSky>::new("sky");
         let sky_bytes = sky_res_loader.load_binary("pure-sky.hdr")?;
         let cube_texture_factory = drawing::textures::CubeTextureFactory::new(&device);
         let sky_texture = cube_texture_factory
@@ -147,8 +153,8 @@ impl State {
         );
 
         let cube_model = {
-            let obj_res_loader = resources::EmbedResLoader::<resources::ResCube>::new("cube");
-            let obj_model_loader = resources::ObjLoader::new(obj_res_loader);
+            let obj_res_loader = EmbedFsAccessor::<embedded_demo_resources::ResCube>::new("cube");
+            let obj_model_loader = ObjLoader::new(obj_res_loader);
             obj_model_loader.load_model("cube.obj", &device, &queue, &texture_bind_group_layout)?
         };
         let cube_model = Arc::new(cube_model);
@@ -156,8 +162,8 @@ impl State {
         let obj_model = if true {
             cube_model.clone()
         } else {
-            let obj_res_loader = resources::EmbedResLoader::<resources::ResAoi>::new("aoi");
-            let obj_model_loader = resources::PmxLoader::new(obj_res_loader);
+            let obj_res_loader = EmbedFsAccessor::<embedded_demo_resources::ResAoi>::new("aoi");
+            let obj_model_loader = PmxLoader::new(obj_res_loader);
             let obj_model = obj_model_loader.load_model(
                 "A.I.VOICE_琴葉葵_ver1.02.pmx",
                 &device,
