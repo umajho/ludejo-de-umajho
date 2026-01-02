@@ -284,7 +284,7 @@ impl State {
             encoder,
             #[allow(unused)]
             |encoder, surface_view| {
-                self.depth_sys.debug_draw(&surface_view, encoder);
+                // self.depth_sys.debug_draw(&surface_view, encoder);
             },
         )?;
 

@@ -33,6 +33,7 @@ impl DepthSystem {
         self.texture.view()
     }
 
+    #[allow(unused)]
     pub fn debug_draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
         self.debug_drawer.draw(view, encoder);
     }
