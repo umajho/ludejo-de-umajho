@@ -4,7 +4,8 @@
     "a": "deno run --allow-env --allow-ffi --allow-sys=homedir '[a]image-to-terminal.ts'",
     "b": "deno run --allow-read='.' --allow-env --allow-ffi --allow-sys=homedir --unstable-webgpu '[b]webgpu-windowing-sdl2.ts'",
     "c": "deno run --allow-read='.' --allow-env --allow-ffi --allow-sys=homedir --unstable-webgpu '[c]draw-on-both-sdl2-and-terminal.ts'",
-    "d": "deno run --allow-read='.' --allow-env --allow-ffi --allow-sys=homedir --unstable-webgpu '[d]webgpu-context-to-terminal.ts'"
+    "d": "deno run --allow-read='.' --allow-env --allow-ffi --allow-sys=homedir --unstable-webgpu '[d]webgpu-context-to-terminal.ts'",
+    "e": "deno run --allow-read='.' --allow-env --allow-ffi --allow-sys=homedir --unstable-webgpu '[e]wasm-wgpu-to-sdl2.ts'"
   },
   "imports": {
     "@divy/sdl2": "jsr:@divy/sdl2@^0.15.0",
