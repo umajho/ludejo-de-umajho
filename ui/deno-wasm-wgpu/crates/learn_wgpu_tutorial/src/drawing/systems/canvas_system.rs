@@ -36,13 +36,13 @@ impl CanvasSystem {
             desired_maximum_frame_latency: 2,
         };
 
-        let cavas = HdrToneMappingCanvas::new(device, &config);
+        let canvas = HdrToneMappingCanvas::new(device, &config);
 
         Self {
             surface,
             surface_config: config,
             is_surface_configured: false,
-            canvas: cavas,
+            canvas,
         }
     }
 
