@@ -102,3 +102,51 @@ pub fn handle_redraw_requested() {
         }
     });
 }
+
+#[cfg(all(target_arch = "wasm32", feature = "wasm-weblike-manual"))]
+#[wasm_bindgen]
+pub fn handle_input_mouse_motion(delta_x: f64, delta_y: f64) {
+    HANDLER.with(|cell| {
+        if let Some(handler) = cell.get() {
+            handler
+                .borrow_mut()
+                .handle_input_mouse_motion(delta_x, delta_y);
+        }
+    });
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "wasm-weblike-manual"))]
+#[wasm_bindgen]
+pub fn handle_input_keyboard(physical_key_code: &str, is_down: bool) {
+    HANDLER.with(|cell| {
+        if let Some(handler) = cell.get() {
+            handler
+                .borrow_mut()
+                .handle_input_keyboard(physical_key_code, is_down);
+        }
+    });
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "wasm-weblike-manual"))]
+#[wasm_bindgen]
+pub fn handle_input_mouse_wheel(delta_x: f64, delta_y: f64, delta_mode: u8) {
+    HANDLER.with(|cell| {
+        if let Some(handler) = cell.get() {
+            handler
+                .borrow_mut()
+                .handle_input_mouse_wheel(delta_x, delta_y, delta_mode);
+        }
+    });
+}
+
+#[cfg(all(target_arch = "wasm32", feature = "wasm-weblike-manual"))]
+#[wasm_bindgen]
+pub fn handle_input_mouse_input(button: u8, is_down: bool) {
+    HANDLER.with(|cell| {
+        if let Some(handler) = cell.get() {
+            handler
+                .borrow_mut()
+                .handle_input_mouse_input(button, is_down);
+        }
+    });
+}
