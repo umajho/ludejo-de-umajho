@@ -1,3 +1,4 @@
 fn main() {
-    learn_wgpu_tutorial::run().unwrap();
+    #[cfg(not(target_arch = "wasm32"))]
+    learn_wgpu_tutorial::run_native_winit().unwrap();
 }

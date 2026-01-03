@@ -1,68 +1,11 @@
-use cgmath::*;
 use std::f32::consts::FRAC_PI_2;
-use winit::dpi::PhysicalPosition;
-use winit::event::*;
-use winit::keyboard::KeyCode;
+
+use crate::{
+    drawing::systems::camera_system::CameraData,
+    io::window_handling::{ElementState, KeyCode, MouseButton, MouseScrollDelta},
+};
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
-
-#[derive(Debug)]
-pub struct Camera {
-    pub position: Point3<f32>,
-    yaw: Rad<f32>,
-    pitch: Rad<f32>,
-}
-
-impl Camera {
-    pub fn new<V: Into<Point3<f32>>, Y: Into<Rad<f32>>, P: Into<Rad<f32>>>(
-        position: V,
-        yaw: Y,
-        pitch: P,
-    ) -> Self {
-        Self {
-            position: position.into(),
-            yaw: yaw.into(),
-            pitch: pitch.into(),
-        }
-    }
-
-    pub fn calc_matrix(&self) -> Matrix4<f32> {
-        let (sin_pitch, cos_pitch) = self.pitch.0.sin_cos();
-        let (sin_yaw, cos_yaw) = self.yaw.0.sin_cos();
-
-        Matrix4::look_to_rh(
-            self.position,
-            Vector3::new(cos_pitch * cos_yaw, sin_pitch, cos_pitch * sin_yaw).normalize(),
-            Vector3::unit_y(),
-        )
-    }
-}
-
-pub struct Projection {
-    aspect: f32,
-    fovy: Rad<f32>,
-    znear: f32,
-    zfar: f32,
-}
-
-impl Projection {
-    pub fn new<F: Into<Rad<f32>>>(width: u32, height: u32, fovy: F, znear: f32, zfar: f32) -> Self {
-        Self {
-            aspect: width as f32 / height as f32,
-            fovy: fovy.into(),
-            znear,
-            zfar,
-        }
-    }
-
-    pub fn resize(&mut self, width: u32, height: u32) {
-        self.aspect = width as f32 / height as f32;
-    }
-
-    pub fn calc_matrix(&self) -> Matrix4<f32> {
-        perspective(self.fovy, self.aspect, self.znear, self.zfar)
-    }
-}
 
 #[derive(Debug)]
 pub struct CameraController {
@@ -77,6 +20,8 @@ pub struct CameraController {
     scroll: f32,
     speed: f32,
     sensitivity: f32,
+
+    mouse_pressed: bool,
 }
 
 impl CameraController {
@@ -93,6 +38,7 @@ impl CameraController {
             scroll: 0.0,
             speed,
             sensitivity,
+            mouse_pressed: false,
         }
     }
 
@@ -132,45 +78,52 @@ impl CameraController {
     }
 
     pub fn handle_mouse(&mut self, mouse_dx: f64, mouse_dy: f64) {
-        self.rotate_horizontal = mouse_dx as f32;
-        self.rotate_vertical = mouse_dy as f32;
+        if self.mouse_pressed {
+            self.rotate_horizontal = mouse_dx as f32;
+            self.rotate_vertical = mouse_dy as f32;
+        }
     }
 
     pub fn handle_mouse_scroll(&mut self, delta: &MouseScrollDelta) {
         self.scroll = -match delta {
             // I'm assuming a line is about 100 pixels
             MouseScrollDelta::LineDelta(_, scroll) => scroll * 100.0,
-            MouseScrollDelta::PixelDelta(PhysicalPosition { y: scroll, .. }) => *scroll as f32,
+            MouseScrollDelta::PixelDelta((_, scroll)) => *scroll as f32,
         };
     }
 
-    pub fn update_camera(&mut self, camera: &mut Camera, dt_s: f32) {
+    pub fn handle_mouse_input(&mut self, button: MouseButton, state: ElementState) {
+        if button == MouseButton::Left {
+            self.mouse_pressed = state == ElementState::Pressed;
+        }
+    }
+
+    pub fn update_camera(&mut self, camera_data: &mut CameraData, dt_s: f32) {
         // Move forward/backward and left/right
-        let (yaw_sin, yaw_cos) = camera.yaw.0.sin_cos();
-        let forward = Vector3::new(yaw_cos, 0.0, yaw_sin).normalize();
-        let right = Vector3::new(-yaw_sin, 0.0, yaw_cos).normalize();
-        camera.position +=
+        let (yaw_sin, yaw_cos) = camera_data.yaw_radians.sin_cos();
+        let forward = glam::vec3(yaw_cos, 0.0, yaw_sin).normalize();
+        let right = glam::vec3(-yaw_sin, 0.0, yaw_cos).normalize();
+        camera_data.position +=
             forward * (self.amount_forward - self.amount_backward) * self.speed * dt_s;
-        camera.position += right * (self.amount_right - self.amount_left) * self.speed * dt_s;
+        camera_data.position += right * (self.amount_right - self.amount_left) * self.speed * dt_s;
 
         // Move in/out (aka. "zoom")
         // Note: this isn't an actual zoom. The camera's position
         // changes when zooming. I've added this to make it easier
         // to get closer to an object you want to focus on.
-        let (pitch_sin, pitch_cos) = camera.pitch.0.sin_cos();
+        let (pitch_sin, pitch_cos) = camera_data.pitch_radians.sin_cos();
         let scrollward =
-            Vector3::new(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
-        camera.position += scrollward * self.scroll * self.speed * self.sensitivity * dt_s;
+            glam::vec3(pitch_cos * yaw_cos, pitch_sin, pitch_cos * yaw_sin).normalize();
+        camera_data.position += scrollward * self.scroll * self.speed * self.sensitivity * dt_s;
         self.scroll = 0.0;
 
         // Move up/down. Since we don't use roll, we can just
         // modify the y coordinate directly.
-        camera.position.y += (self.amount_up - self.amount_down) * self.speed * dt_s;
+        camera_data.position.y += (self.amount_up - self.amount_down) * self.speed * dt_s;
 
         // Rotate
-        camera.yaw += Rad(self.rotate_horizontal) * self.sensitivity * dt_s;
-        camera.pitch += Rad(-self.rotate_vertical) * self.sensitivity * dt_s;
-
+        camera_data.yaw_radians += self.rotate_horizontal * self.sensitivity * dt_s;
+        camera_data.pitch_radians += -self.rotate_vertical * self.sensitivity * dt_s;
         // If process_mouse isn't called every frame, these values
         // will not get set to zero, and the camera will rotate
         // when moving in a non-cardinal direction.
@@ -178,10 +131,10 @@ impl CameraController {
         self.rotate_vertical = 0.0;
 
         // Keep the camera's angle from going too high/low.
-        if camera.pitch < -Rad(SAFE_FRAC_PI_2) {
-            camera.pitch = -Rad(SAFE_FRAC_PI_2);
-        } else if camera.pitch > Rad(SAFE_FRAC_PI_2) {
-            camera.pitch = Rad(SAFE_FRAC_PI_2);
+        if camera_data.pitch_radians < -SAFE_FRAC_PI_2 {
+            camera_data.pitch_radians = -SAFE_FRAC_PI_2;
+        } else if camera_data.pitch_radians > SAFE_FRAC_PI_2 {
+            camera_data.pitch_radians = SAFE_FRAC_PI_2;
         }
     }
 }

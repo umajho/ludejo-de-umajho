@@ -19,11 +19,77 @@
   </head>
 
   <body id="wasm-example">
-    <canvas id="canvas"></canvas>
+    <canvas id="canvas" tabindex="-1"></canvas>
     <script type="module">
-      import init from "./dist/learn_wgpu_tutorial.js";
-      await init();
-      console.log("WASM Loaded");
+      import init, * as w from "./dist-web-manual/learn_wgpu_tutorial.js";
+
+      window.addEventListener("DOMContentLoaded", async () => {
+        await init();
+
+        /** @type {HTMLCanvasElement} */
+        const canvas = document.getElementById("canvas");
+        const offscreenCanvas = canvas.transferControlToOffscreen();
+
+        Object.defineProperty(offscreenCanvas, "xRequestRedraw", {
+          value: () => {
+            requestAnimationFrame(w.handle_redraw_requested);
+          },
+        });
+
+        await w.run_web_weblike_manual(offscreenCanvas);
+        console.log("WASM Loaded");
+
+        setUpResizeObserver(canvas, offscreenCanvas, w.handle_resized);
+        setUpEventListeners(canvas, w);
+
+        w.handle_redraw_requested();
+      });
+
+      function setUpResizeObserver(
+        canvas,
+        offscreenCanvas,
+        handle_resized,
+      ) {
+        const resizeObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            const width = entry.contentRect.width;
+            const height = entry.contentRect.height;
+            offscreenCanvas.width = width * devicePixelRatio;
+            offscreenCanvas.height = height * devicePixelRatio;
+            w.handle_resized(
+              offscreenCanvas.width,
+              offscreenCanvas.height,
+            );
+          }
+        });
+        resizeObserver.observe(canvas);
+      }
+
+      function setUpEventListeners(canvas, w) {
+        canvas.addEventListener("mousemove", (ev) => {
+          w.handle_input_mouse_motion(ev.movementX, ev.movementY);
+        });
+        canvas.addEventListener("keydown", (ev) => {
+          w.handle_input_keyboard(ev.code, true);
+        });
+        canvas.addEventListener("keyup", (ev) => {
+          w.handle_input_keyboard(ev.code, false);
+        });
+        canvas.addEventListener("wheel", (ev) => {
+          ev.preventDefault();
+          w.handle_input_mouse_wheel(
+            ev.deltaX,
+            ev.deltaY,
+            ev.deltaMode,
+          );
+        });
+        canvas.addEventListener("mousedown", (ev) => {
+          w.handle_input_mouse_input(ev.button, true);
+        });
+        canvas.addEventListener("mouseup", (ev) => {
+          w.handle_input_mouse_input(ev.button, false);
+        });
+      }
     </script>
   </body>
 </html>

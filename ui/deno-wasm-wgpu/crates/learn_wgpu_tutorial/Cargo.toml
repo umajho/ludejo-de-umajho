@@ -3,11 +3,22 @@ name = "learn_wgpu_tutorial"
 version = "0.1.0"
 edition = "2024"
 
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[features]
+native-winit = []
+wasm-winit = []
+wasm-weblike-manual = []
+
+# default = ["native-winit"]
+default = ["native-winit", "wasm-weblike-manual"]
+
 [dependencies]
 anyhow = "1.0.100"
 bytemuck = { version = "1.24.0", features = ["derive"] }
-cgmath = "0.18.0"
 env_logger = "0.11.8"
+glam = { version = "0.30.9", features = ["bytemuck"] }
 image = { version = "0.24.9", default-features = false, features = [
   "png",
   "jpeg",
@@ -20,6 +31,7 @@ pollster = "0.4.0"
 rust-embed = "8.9.0"
 tobj = { version = "4.0.3", default-features = false, features = ["async"] }
 trig-const = "0.3.0"
+wesl = "0.3.2"
 wgpu = "27.0.1"
 winit = { version = "0.30.12", features = ["android-native-activity"] }
 
@@ -30,5 +42,5 @@ wasm-bindgen = "0.2.106"
 wasm-bindgen-futures = "0.4.56"
 web-sys = { version = "0.3.83", features = ["Document", "Window", "Element"] }
 
-[lib]
-crate-type = ["cdylib", "rlib"]
+[build-dependencies]
+wesl = "0.3.2"

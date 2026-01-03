@@ -1,10 +1,14 @@
-web-build:
-  wasm-pack build --target web . --out-dir dist
+web-winit-build:
+  wasm-pack build --target web . --out-dir dist-web-winit -- --features wasm-winit
+
+web-manual-build:
+  wasm-pack build --target web . --out-dir dist-web-manual -- --features wasm-weblike-manual
 
 web-serve:
   python3 -m http.server 3333 --directory .
 
 native-dev:
+  # use `shift-f9` to toggle the hud.
   MTL_HUD_ENABLED=1 cargo run
 
 native-run:
