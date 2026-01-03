@@ -58,10 +58,19 @@ export const raw = (() => {
       parameters: ["pointer", "i32", "i32"],
       result: "i32",
     },
+    SDL_GetRendererOutputSize: {
+      parameters: ["pointer", "pointer", "pointer"],
+      result: "i32",
+    },
   });
 
   function getWindowRawPointer(window: Window): Deno.PointerValue {
     return window["raw"];
+  }
+
+  function getRenderer(window: Window): Deno.PointerValue {
+    const canvas = window.canvas();
+    return canvas["target"];
   }
 
   return {
@@ -75,6 +84,15 @@ export const raw = (() => {
     },
     SDL_SetWindowSize: (window: Window, width: number, height: number) => {
       return sdl2.symbols.SDL_SetWindowSize(getWindowRawPointer(window), width, height);
+    },
+    SDL_GetRendererOutputSize: (window: Window) => {
+      const renderer = getRenderer(window);
+      const wBuf = new Uint32Array(1);
+      const hBuf = new Uint32Array(1);
+      const wPtr = Deno.UnsafePointer.of(wBuf);
+      const hPtr = Deno.UnsafePointer.of(hBuf);
+      sdl2.symbols.SDL_GetRendererOutputSize(renderer, wPtr, hPtr);
+      return { width: wBuf[0], height: hBuf[0] };
     },
   };
 })();
