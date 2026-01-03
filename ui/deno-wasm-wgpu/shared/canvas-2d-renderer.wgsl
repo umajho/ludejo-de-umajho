@@ -2,15 +2,11 @@
 
 @vertex
 fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
-  let pos = array<vec2f, 6>(
-    vec2f(-1.0, -1.0),
-    vec2f( 1.0, -1.0),
-    vec2f(-1.0,  1.0),
-    vec2f(-1.0,  1.0),
-    vec2f( 1.0, -1.0),
-    vec2f( 1.0,  1.0)
+  let uv = vec2<f32>(
+    f32((i << 1u) & 2u),
+    f32(i & 2u)
   );
-  return vec4f(pos[i], 0.0, 1.0);
+  return vec4f(uv * 2.0 - 1.0, 0.0, 1.0);
 }
 
 @group(0) @binding(0) var mySampler: sampler;
