@@ -21,7 +21,9 @@ use crate::{
         fs_accessors::{FsAccessor, embed_fs_accessor::EmbedFsAccessor},
         window_handling::{ApplicationContext, Input, PhysicalKey, SimpleApplicationEventHandler},
     },
-    model_loaders::{ModelLoader, obj_loader::ObjLoader, pmx_loader::PmxLoader},
+    model_loaders::{
+        ModelLoader, obj_loader::ObjLoader, pmx_loader::PmxLoader, virtual_loader::VirtualLoader,
+    },
     utils,
 };
 
@@ -147,8 +149,13 @@ impl App {
             Box::new(instance_provider),
         ));
 
+        let simple_cube_mesh_for_light_source_indicator =
+            VirtualLoader::make_cube_mesh_with_minimal_effort_for_light_source_indicators(
+                &device, 1.0,
+            );
+
         model_sys.set_model_entry_light_source_indicator(ModelEntryLightSourceIndicator::new(
-            cube_model,
+            Arc::new(simple_cube_mesh_for_light_source_indicator),
         ));
 
         Ok(Self {

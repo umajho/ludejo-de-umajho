@@ -176,7 +176,7 @@ impl ModelEntrySimple {
         render_pass.set_vertex_buffer(1, self.instance_buffer.slice(..));
         render_pass.set_pipeline(pipeline);
 
-        for mesh in self.model.meshes() {
+        for mesh in self.model.meshes().iter() {
             let material = &self.model.materials()[mesh.material_index()];
 
             Self::draw_mesh_instanced(
@@ -225,12 +225,16 @@ impl Drop for ModelEntrySimple {
 }
 
 pub struct ModelEntryLightSourceIndicator {
-    model: Arc<Model>,
+    /// ## TODO
+    ///
+    /// instead of using [`Mesh`], use a specialized lightweight mesh type that
+    /// only carries positions and indices.
+    mesh: Arc<Mesh>,
 }
 
 impl ModelEntryLightSourceIndicator {
-    pub fn new(model: Arc<Model>) -> Self {
-        Self { model }
+    pub fn new(mesh: Arc<Mesh>) -> Self {
+        Self { mesh }
     }
 
     fn draw(
@@ -242,9 +246,7 @@ impl ModelEntryLightSourceIndicator {
     ) {
         render_pass.set_pipeline(pipeline);
 
-        for mesh in self.model.meshes() {
-            Self::draw_light_mesh(render_pass, mesh, camera_sys, light_sys);
-        }
+        Self::draw_light_mesh(render_pass, &self.mesh, camera_sys, light_sys);
     }
 
     fn draw_light_mesh(

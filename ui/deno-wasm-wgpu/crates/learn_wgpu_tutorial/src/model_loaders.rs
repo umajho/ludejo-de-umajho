@@ -2,6 +2,7 @@ use crate::drawing::models::Model;
 
 pub mod obj_loader;
 pub mod pmx_loader;
+pub mod virtual_loader;
 
 /// ## TODO
 ///

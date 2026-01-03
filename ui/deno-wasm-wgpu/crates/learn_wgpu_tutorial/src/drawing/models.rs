@@ -1,19 +1,24 @@
+use std::sync::Arc;
+
 use wgpu::util::DeviceExt;
 
 use crate::drawing::textures;
 
 pub struct Model {
-    meshes: Vec<Mesh>,
+    meshes: Arc<Vec<Mesh>>,
     materials: Vec<Material>,
 }
 
 impl Model {
     pub fn new(meshes: Vec<Mesh>, materials: Vec<Material>) -> Self {
-        Self { meshes, materials }
+        Self {
+            meshes: Arc::new(meshes),
+            materials,
+        }
     }
 
-    pub fn meshes(&self) -> &Vec<Mesh> {
-        &self.meshes
+    pub fn meshes(&self) -> Arc<Vec<Mesh>> {
+        self.meshes.clone()
     }
 
     pub fn materials(&self) -> &Vec<Material> {
