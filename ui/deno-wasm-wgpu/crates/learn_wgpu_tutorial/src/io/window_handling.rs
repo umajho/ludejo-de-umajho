@@ -1,3 +1,8 @@
+use std::pin::Pin;
+
+#[cfg(all(target_arch = "wasm32", feature = "wasm-weblike-manual"))]
+pub mod weblike_manual;
+#[cfg(any(feature = "native-winit", feature = "wasm-winit"))]
 pub mod winit;
 
 pub trait SimpleApplicationEventHandler {
@@ -15,6 +20,16 @@ pub trait ApplicationContext {
     fn request_redraw(&self);
     fn window_size(&self) -> (u32, u32);
 }
+
+pub type ApplicationInit = Box<
+    dyn FnOnce(
+        wgpu::SurfaceTarget<'static>,          // surface_target
+        Box<dyn ApplicationContext + 'static>, // ctx
+        glam::UVec2,                           // size
+    )
+        -> Pin<Box<dyn std::future::Future<Output = anyhow::Result<Application>> + 'static>>,
+>;
+pub type Application = Box<dyn SimpleApplicationEventHandler + 'static>;
 
 pub enum Input {
     /// corresponds to [`winit::event::DeviceEvent::MouseMotion`].

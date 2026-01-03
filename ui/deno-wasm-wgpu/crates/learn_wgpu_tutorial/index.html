@@ -21,9 +21,48 @@
   <body id="wasm-example">
     <canvas id="canvas"></canvas>
     <script type="module">
-      import init from "./dist/learn_wgpu_tutorial.js";
-      await init();
-      console.log("WASM Loaded");
+      import init, * as w from "./dist-web-manual/learn_wgpu_tutorial.js";
+
+      window.addEventListener("DOMContentLoaded", async () => {
+        await init();
+
+        /** @type {HTMLCanvasElement} */
+        const canvas = document.getElementById("canvas");
+        const offscreenCanvas = canvas.transferControlToOffscreen();
+
+        Object.defineProperty(offscreenCanvas, "xRequestRedraw", {
+          value: () => {
+            requestAnimationFrame(w.handle_redraw_requested);
+          },
+        });
+
+        await w.run_web_weblike_manual(offscreenCanvas);
+        console.log("WASM Loaded");
+
+        setUpResizeObserver(canvas, offscreenCanvas, w.handle_resized);
+
+        w.handle_redraw_requested();
+      });
+
+      function setUpResizeObserver(
+        canvas,
+        offscreenCanvas,
+        handle_resized,
+      ) {
+        const resizeObserver = new ResizeObserver((entries) => {
+          for (const entry of entries) {
+            const width = entry.contentRect.width;
+            const height = entry.contentRect.height;
+            offscreenCanvas.width = width * devicePixelRatio;
+            offscreenCanvas.height = height * devicePixelRatio;
+            w.handle_resized(
+              offscreenCanvas.width,
+              offscreenCanvas.height,
+            );
+          }
+        });
+        resizeObserver.observe(canvas);
+      }
     </script>
   </body>
 </html>

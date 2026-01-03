@@ -1,4 +1,4 @@
-use std::{pin::Pin, sync::Arc};
+use std::sync::Arc;
 
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
@@ -13,7 +13,8 @@ use winit::{
 };
 
 use crate::io::window_handling::{
-    ApplicationContext, ElementState, Input, KeyCode, MouseButton, MouseScrollDelta, PhysicalKey,
+    Application, ApplicationContext, ApplicationInit, ElementState, Input, KeyCode, MouseButton,
+    MouseScrollDelta, PhysicalKey,
 };
 
 pub struct WinitWindowHandler {
@@ -24,31 +25,20 @@ pub struct WinitWindowHandler {
     window: Option<Arc<Window>>,
 }
 
-type Init = Box<
-    dyn FnOnce(
-        wgpu::SurfaceTarget<'static>,          // surface_target
-        Box<dyn ApplicationContext + 'static>, // ctx
-        glam::UVec2,                           // size
-    ) -> Pin<
-        Box<dyn std::future::Future<Output = anyhow::Result<InnerHandler>> + 'static>,
-    >,
->;
-type InnerHandler = Box<dyn super::SimpleApplicationEventHandler + 'static>;
-
 #[allow(unused)]
 pub struct UserEvent {
-    inner_handler: InnerHandler,
+    inner_handler: Application,
     window: Arc<Window>,
 }
 
 enum State {
-    Uninitialized(Option<Init>),
-    Ready(InnerHandler),
+    Uninitialized(Option<ApplicationInit>),
+    Ready(Application),
 }
 
 impl WinitWindowHandler {
     pub fn new(
-        init: Init,
+        init: ApplicationInit,
         #[cfg(target_arch = "wasm32")] event_loop: &EventLoop<UserEvent>,
     ) -> Self {
         Self {
