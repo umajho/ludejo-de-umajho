@@ -119,8 +119,8 @@ impl<T: FsAccessor> ModelLoader for PmxLoader<T> {
             calculate_tangent_and_bitangent(&mut vertices, &indices);
 
             meshes.push(Mesh::new(
-                device,
                 &format!("#{}/{}", self.res_loader.name(), filename),
+                device,
                 &vertices,
                 &indices,
                 m_i,
@@ -142,7 +142,7 @@ impl<T: FsAccessor> PmxLoader<T> {
     ) -> anyhow::Result<textures::D2DiffuseTexture> {
         let data = self.res_loader.load_binary(filename)?;
         let texture =
-            textures::D2DiffuseTexture::from_image_in_memory(device, queue, &data, filename)?;
+            textures::D2DiffuseTexture::from_image_in_memory(filename, device, queue, &data)?;
         Ok(texture)
     }
     #[allow(unused)]
@@ -154,7 +154,7 @@ impl<T: FsAccessor> PmxLoader<T> {
     ) -> anyhow::Result<textures::D2NormalTexture> {
         let data = self.res_loader.load_binary(filename)?;
         let texture =
-            textures::D2NormalTexture::from_image_in_memory(device, queue, &data, filename)?;
+            textures::D2NormalTexture::from_image_in_memory(filename, device, queue, &data)?;
         Ok(texture)
     }
 }

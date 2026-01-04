@@ -3,10 +3,10 @@ use super::d2::D2TextureRgba16Float;
 pub struct D2CanvasHdrTexture(D2TextureRgba16Float);
 
 impl D2CanvasHdrTexture {
-    pub fn new(device: &wgpu::Device, label: &str, opts: NewD2CanvasHdrTextureOptions) -> Self {
+    pub fn new(name: &str, device: &wgpu::Device, opts: NewD2CanvasHdrTextureOptions) -> Self {
         let inner = D2TextureRgba16Float::new(
+            name,
             device,
-            Some(label),
             super::d2::NewD2TextureOptions {
                 is_color_map: true,
                 size: opts.size,

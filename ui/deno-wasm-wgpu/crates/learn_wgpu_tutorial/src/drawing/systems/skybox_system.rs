@@ -20,7 +20,7 @@ impl SkyboxSystem {
     ) -> Self {
         let environment_bind_group_layout =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                label: Some("environment_layout"),
+                label: Some("[SkyboxSystem::new] bind group layout for environment"),
                 entries: &[
                     wgpu::BindGroupLayoutEntry {
                         binding: 0,
@@ -42,7 +42,7 @@ impl SkyboxSystem {
             });
 
         let environment_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("environment_bind_group"),
+            label: Some("[SkyboxSystem::new] bind group for environment"),
             layout: &environment_bind_group_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -58,7 +58,7 @@ impl SkyboxSystem {
 
         let sky_pipeline = {
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Sky Pipeline Layout"),
+                label: Some("[SkyboxSystem::new] render pipeline layout for skybox"),
                 bind_group_layouts: &[
                     camera_sys.bind_group_layout(),
                     &environment_bind_group_layout,
@@ -66,7 +66,7 @@ impl SkyboxSystem {
                 push_constant_ranges: &[],
             });
             make_render_pipeline(
-                "sky",
+                "[SkyboxSystem::new] render pipeline for skybox",
                 &device,
                 &layout,
                 canvas_sys.canvas_color_format(),

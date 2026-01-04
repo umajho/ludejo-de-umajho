@@ -32,7 +32,7 @@ pub(self) mod utils {
         let image = image::RgbImage::from_vec(width, height, normal_data).unwrap();
         let image = image::DynamicImage::ImageRgb8(image);
 
-        textures::D2NormalTexture::from_image(device, queue, &image, None)
+        textures::D2NormalTexture::from_image("memory:flat-normal-texture", device, queue, &image)
     }
 
     pub fn calculate_tangent_and_bitangent(vertices: &mut [ModelVertex], indices: &[u32]) {

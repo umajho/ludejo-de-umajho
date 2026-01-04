@@ -15,9 +15,9 @@ pub struct CubeTexture<T: super::TextureFormat> {
 type TheTextureFormat = super::TextureFormatRgba32Float;
 
 impl CubeTexture<TheTextureFormat> {
-    fn new(device: &wgpu::Device, label: Option<&str>, opts: NewCubeTextureOptions) -> Self {
+    fn new(name: &str, device: &wgpu::Device, opts: NewCubeTextureOptions) -> Self {
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label,
+            label: Some(&format!("[CubeTexture::new] texture for {}", name)),
             size: wgpu::Extent3d {
                 width: opts.size.x,
                 height: opts.size.y,
@@ -32,14 +32,14 @@ impl CubeTexture<TheTextureFormat> {
         });
 
         let view = texture.create_view(&wgpu::TextureViewDescriptor {
-            label,
+            label: Some(&format!("[CubeTexture::new] texture view for {}", name)),
             dimension: Some(wgpu::TextureViewDimension::Cube),
             array_layer_count: Some(6),
             ..Default::default()
         });
 
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label,
+            label: Some(&format!("[CubeTexture::new] sampler for {}", name)),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -60,10 +60,10 @@ impl CubeTexture<TheTextureFormat> {
     fn try_from_equirectangular_hdr_image_in_memory<
         F: FnOnce(&wgpu::TextureView, &wgpu::TextureView) -> (),
     >(
+        name: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         hdr_bytes: &[u8],
-        label: &str,
         opts: CubeTextureFromHdrEquirectangularBytesOptions<F>,
     ) -> anyhow::Result<Self> {
         let hdr_decoder = image::codecs::hdr::HdrDecoder::new(std::io::Cursor::new(hdr_bytes))?;
@@ -72,17 +72,17 @@ impl CubeTexture<TheTextureFormat> {
         let pixels = utils::hdr_decoder_to_pixels!(hdr_decoder);
 
         let src = D2TextureRgba32Float::from_pixel_buffer(
+            name,
             device,
             queue,
             (meta.width, meta.height),
             &bytemuck::cast_slice(&pixels),
-            Some(label),
             true,
         );
 
         let dst = CubeTexture::new(
+            name,
             device,
-            Some(label),
             NewCubeTextureOptions {
                 size: (opts.dst_size, opts.dst_size).into(),
                 usage: wgpu::TextureUsages::STORAGE_BINDING | wgpu::TextureUsages::TEXTURE_BINDING,
@@ -90,7 +90,7 @@ impl CubeTexture<TheTextureFormat> {
         );
 
         let dst_view = dst.texture().create_view(&wgpu::TextureViewDescriptor {
-            label: Some(label),
+            label: Some("[CubeTexture::try_from_equirectangular_hdr_image_in_memory] texture view of destination for compute"),
             dimension: Some(wgpu::TextureViewDimension::D2Array),
             ..Default::default()
         });
@@ -162,7 +162,7 @@ pub struct CubeTextureFactory {
 impl CubeTextureFactory {
     pub fn new(device: &wgpu::Device) -> Self {
         let equirect_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("HdrLoader::equirect_layout"),
+            label: Some("[CubeTextureFactory::new] bind group layout for equirect to cubemap"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -188,7 +188,7 @@ impl CubeTextureFactory {
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
+            label: Some("[CubeTextureFactory::new] pipeline layout for equirect to cubemap"),
             bind_group_layouts: &[&equirect_layout],
             push_constant_ranges: &[],
         });
@@ -196,7 +196,7 @@ impl CubeTextureFactory {
         let equirect_to_cubemap = device.create_compute_pipeline(
             &shaders::c_equirectangular(device).compute_pipeline_descriptor(
                 shaders::ComputePipelineDescriptorPartial {
-                    label: Some("equirect_to_cube_map"),
+                    label: "[CubeTextureFactory::new] compute pipeline of equirect to cubemap",
                     layout: Some(&pipeline_layout),
                     compilation_options: Default::default(),
                     cache: None,
@@ -212,22 +212,22 @@ impl CubeTextureFactory {
 
     pub fn try_make_cube_texture_from_equirectangular_hdr_image_in_memory(
         &self,
+        name: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         hdr_bytes: &[u8],
         dst_size: u32,
-        label: &str,
     ) -> anyhow::Result<CubeTexture<TheTextureFormat>> {
         CubeTexture::try_from_equirectangular_hdr_image_in_memory(
+            name,
             device,
             queue,
             hdr_bytes,
-            label,
             CubeTextureFromHdrEquirectangularBytesOptions {
                 dst_size,
                 compute_equirect_to_cubemap: |src_view, dst_view| {
                     self.compute_equirect_to_cubemap(
-                        device, queue, src_view, dst_view, dst_size, label,
+                        name, device, queue, src_view, dst_view, dst_size,
                     )
                 },
             },
@@ -236,15 +236,18 @@ impl CubeTextureFactory {
 
     fn compute_equirect_to_cubemap(
         &self,
+        name: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         src_view: &wgpu::TextureView,
         dst_view: &wgpu::TextureView,
         dst_size: u32,
-        label: &str,
     ) {
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some(label),
+            label: Some(&format!(
+                "[CubeTextureFactory::compute_equirect_to_cubemap] bind group for {}",
+                name
+            )),
             layout: &self.equirect_layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -262,7 +265,10 @@ impl CubeTextureFactory {
 
         {
             let mut pass = encoder.begin_compute_pass(&wgpu::ComputePassDescriptor {
-                label: Some(label),
+                label: Some(&format!(
+                    "[CubeTextureFactory::compute_equirect_to_cubemap] compute pass for {}",
+                    name
+                )),
                 timestamp_writes: None,
             });
 

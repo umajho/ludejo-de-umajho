@@ -4,22 +4,22 @@ pub struct D2DiffuseTexture(D2TextureRgba8);
 
 impl D2DiffuseTexture {
     pub fn from_image_in_memory(
+        name: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         bytes: &[u8],
-        label: &str,
     ) -> anyhow::Result<Self> {
-        let inner = D2TextureRgba8::from_image_in_memory(device, queue, bytes, label, true)?;
+        let inner = D2TextureRgba8::from_image_in_memory(name, device, queue, bytes, true)?;
         Ok(Self(inner))
     }
 
     // pub fn from_image(
+    //     name: Option<&str>,
     //     device: &wgpu::Device,
     //     queue: &wgpu::Queue,
     //     img: &image::DynamicImage,
-    //     label: Option<&str>,
     // ) -> Self {
-    //     let inner = D2TextureRgba8::from_image(device, queue, img, label, true);
+    //     let inner = D2TextureRgba8::from_image(name, device, queue, img, true);
     //     Self(inner)
     // }
 

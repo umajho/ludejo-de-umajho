@@ -17,8 +17,12 @@ pub use depth::DepthTexture;
 pub use depth::{DEPTH_FORMAT, DepthTextureNonComparisonSampler};
 pub use formats::*;
 
-pub fn make_regular_d2_texture_bind_group_layout(device: &wgpu::Device) -> wgpu::BindGroupLayout {
+pub fn make_regular_d2_texture_bind_group_layout(
+    label: &str,
+    device: &wgpu::Device,
+) -> wgpu::BindGroupLayout {
     device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: Some(label),
         entries: &[
             // diffuse texture
             wgpu::BindGroupLayoutEntry {
@@ -57,6 +61,5 @@ pub fn make_regular_d2_texture_bind_group_layout(device: &wgpu::Device) -> wgpu:
                 count: None,
             },
         ],
-        label: Some("texture_bind_group_layout"),
     })
 }

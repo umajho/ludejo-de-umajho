@@ -42,7 +42,7 @@ impl DepthSystem {
         device: &wgpu::Device,
         size: glam::UVec2,
     ) -> textures::DepthTextureNonComparisonSampler {
-        textures::DepthTextureNonComparisonSampler::new(device, size, "depth_texture")
+        textures::DepthTextureNonComparisonSampler::new("memory:depth_texture", device, size)
     }
 }
 
@@ -86,7 +86,7 @@ impl DebugDrawer {
         let shader = shaders::r_depth_debug(&device);
 
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Depth Pass Layout"),
+            label: Some("[DebugDrawer::new] bind group layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -110,24 +110,24 @@ impl DebugDrawer {
         let bind_group = Self::make_bind_group(device, &layout, texture);
 
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Depth Pass VB"),
+            label: Some("[DebugDrawer::new] vertex buffer"),
             contents: bytemuck::cast_slice(DEPTH_VERTICES),
             usage: wgpu::BufferUsages::VERTEX,
         });
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Depth Pass IB"),
+            label: Some("[DebugDrawer::new] index buffer"),
             contents: bytemuck::cast_slice(DEPTH_INDICES),
             usage: wgpu::BufferUsages::INDEX,
         });
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Depth Pass Pipeline Layout"),
+            label: Some("[DebugDrawer::new] render pipeline layout"),
             bind_group_layouts: &[&layout],
             push_constant_ranges: &[],
         });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            label: Some("Depth Pass Render Pipeline"),
+            label: Some("[DebugDrawer::new] render pipeline"),
             layout: Some(&pipeline_layout),
             vertex: shader.vertex_state(shaders::VertexStatePartial {
                 buffers: &[ShapeVertex::desc()],
@@ -193,6 +193,7 @@ impl DebugDrawer {
         texture: &textures::DepthTextureNonComparisonSampler,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("[DebugDrawer::make_bind_group] bind group"),
             layout: &layout,
             entries: &[
                 wgpu::BindGroupEntry {
@@ -204,14 +205,13 @@ impl DebugDrawer {
                     resource: wgpu::BindingResource::Sampler(texture.sampler()),
                 },
             ],
-            label: Some("depth_pass.bind_group"),
         })
     }
 
     #[allow(unused)]
     fn draw(&self, view: &wgpu::TextureView, encoder: &mut wgpu::CommandEncoder) {
         let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("Depth Visual Render Pass"),
+            label: Some("[DebugDrawer::draw] render pass"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                 view: &view,
                 depth_slice: None,

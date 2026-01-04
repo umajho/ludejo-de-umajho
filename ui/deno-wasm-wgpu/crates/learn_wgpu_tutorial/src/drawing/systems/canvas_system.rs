@@ -103,7 +103,7 @@ struct HdrToneMappingCanvas {
 impl HdrToneMappingCanvas {
     fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("Hdr::layout"),
+            label: Some("[HdrToneMappingCanvas::new] bind group layout"),
             entries: &[
                 wgpu::BindGroupLayoutEntry {
                     binding: 0,
@@ -133,13 +133,13 @@ impl HdrToneMappingCanvas {
         debug_assert_eq!(texture.texture().format(), CANVAS_COLOR_FORMAT);
 
         let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: None,
+            label: Some("[HdrToneMappingCanvas::new] render pipeline layout"),
             bind_group_layouts: &[&layout],
             push_constant_ranges: &[],
         });
 
         let pipeline = make_render_pipeline(
-            "hdr",
+            "[HdrToneMappingCanvas::new] render pipeline",
             device,
             &pipeline_layout,
             config.format,
@@ -171,8 +171,8 @@ impl HdrToneMappingCanvas {
         size: glam::UVec2,
     ) -> (textures::D2CanvasHdrTexture, wgpu::BindGroup) {
         let texture = textures::D2CanvasHdrTexture::new(
+            "memory:hdr-tone-mapping-canvas",
             device,
-            "Hdr::texture",
             textures::NewD2CanvasHdrTextureOptions { size },
         );
         let bind_group = Self::make_bind_group(device, layout, &texture);
@@ -185,7 +185,7 @@ impl HdrToneMappingCanvas {
         texture: &textures::D2CanvasHdrTexture,
     ) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("Hdr::bind_group"),
+            label: Some("[HdrToneMappingCanvas::make_bind_group] bind group"),
             layout,
             entries: &[
                 wgpu::BindGroupEntry {

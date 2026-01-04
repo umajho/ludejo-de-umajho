@@ -19,7 +19,7 @@ impl CameraSystem {
                 },
                 count: None,
             }],
-            label: Some("camera_bind_group_layout"),
+            label: Some("[CameraSystem::new] bind group layout for camera"),
         });
 
         let entry = CameraEntry::new(device, size, &bind_group_layout);
@@ -72,7 +72,7 @@ impl CameraEntry {
         uniform.update_view_proj(&camera, &projection);
 
         let uniform_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Camera Buffer"),
+            label: Some("[CameraSystem::new] buffer for camera uniform"),
             contents: bytemuck::cast_slice(&[uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
@@ -83,7 +83,7 @@ impl CameraEntry {
                 binding: 0,
                 resource: uniform_buffer.as_entire_binding(),
             }],
-            label: Some("camera_bind_group"),
+            label: Some("[CameraSystem::new] bind group for camera uniform"),
         });
 
         Self {

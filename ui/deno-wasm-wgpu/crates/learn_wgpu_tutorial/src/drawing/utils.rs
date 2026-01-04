@@ -1,7 +1,7 @@
 use crate::drawing::shaders;
 
 pub fn make_render_pipeline(
-    name: &str,
+    label: &str,
     device: &wgpu::Device,
     layout: &wgpu::PipelineLayout,
     color_format: wgpu::TextureFormat,
@@ -11,7 +11,7 @@ pub fn make_render_pipeline(
     shader: &shaders::RenderShader,
 ) -> wgpu::RenderPipeline {
     device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-        label: Some(format!("Render Pipeline: {}", name).as_str()),
+        label: Some(label),
         layout: Some(&layout),
         vertex: shader.vertex_state(shaders::VertexStatePartial {
             compilation_options: wgpu::PipelineCompilationOptions::default(),

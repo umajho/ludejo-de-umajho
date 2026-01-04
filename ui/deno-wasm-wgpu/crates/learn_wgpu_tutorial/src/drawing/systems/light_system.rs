@@ -9,6 +9,7 @@ impl LightSystem {
     pub fn new(device: &wgpu::Device) -> Self {
         let bind_group_layout_demo =
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                label: Some("[LightSystem::new] bind group layout"),
                 entries: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStages::VERTEX | wgpu::ShaderStages::FRAGMENT,
@@ -19,7 +20,6 @@ impl LightSystem {
                     },
                     count: None,
                 }],
-                label: None,
             });
 
         let entry_demo = LightEntryDemo::new(device, &bind_group_layout_demo);
@@ -59,18 +59,18 @@ impl LightEntryDemo {
         };
 
         let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some("Light VB"),
+            label: Some("[LightEntryDemo::new] uniform buffer"),
             contents: bytemuck::cast_slice(&[uniform]),
             usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         });
 
         let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            label: Some("[LightEntryDemo::new] bind group"),
             layout,
             entries: &[wgpu::BindGroupEntry {
                 binding: 0,
                 resource: buffer.as_entire_binding(),
             }],
-            label: None,
         });
 
         Self {

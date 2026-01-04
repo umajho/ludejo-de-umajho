@@ -49,8 +49,8 @@ impl VirtualLoader {
         ];
 
         Mesh::new(
-            device,
             "VirtualLoader::make_cube_mesh_with_minimal_effort_for_light_source_indicators",
+            device,
             &vertices,
             &indices,
             /* not used for light source indicators. */ 0,

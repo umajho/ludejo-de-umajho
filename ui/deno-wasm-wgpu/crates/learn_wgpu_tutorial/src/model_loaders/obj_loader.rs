@@ -86,8 +86,8 @@ impl<T: FsAccessor> ModelLoader for ObjLoader<T> {
                 calculate_tangent_and_bitangent(&mut vertices, &m.mesh.indices);
 
                 Mesh::new(
-                    device,
                     &format!("#{}/{}", self.res_loader.name(), filename),
+                    device,
                     &vertices,
                     &m.mesh.indices,
                     m.mesh.material_id.unwrap_or(0),
@@ -108,7 +108,7 @@ impl<T: FsAccessor> ObjLoader<T> {
     ) -> anyhow::Result<textures::D2DiffuseTexture> {
         let data = self.res_loader.load_binary(filename)?;
         let texture =
-            textures::D2DiffuseTexture::from_image_in_memory(device, queue, &data, filename)?;
+            textures::D2DiffuseTexture::from_image_in_memory(filename, device, queue, &data)?;
         Ok(texture)
     }
     fn load_normal_texture(
@@ -119,7 +119,7 @@ impl<T: FsAccessor> ObjLoader<T> {
     ) -> anyhow::Result<textures::D2NormalTexture> {
         let data = self.res_loader.load_binary(filename)?;
         let texture =
-            textures::D2NormalTexture::from_image_in_memory(device, queue, &data, filename)?;
+            textures::D2NormalTexture::from_image_in_memory(filename, device, queue, &data)?;
         Ok(texture)
     }
 }

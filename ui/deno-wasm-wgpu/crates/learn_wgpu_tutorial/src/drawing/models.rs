@@ -35,19 +35,19 @@ pub struct Mesh {
 
 impl Mesh {
     pub fn new(
-        device: &wgpu::Device,
         name: &str,
+        device: &wgpu::Device,
         vertices: &[ModelVertex],
         indices: &[u32],
         material_index: usize,
     ) -> Self {
         let vertex_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{} Vertex Buffer", name)),
+            label: Some(&format!("[Mesh::new] vertex buffer for {}", name)),
             contents: bytemuck::cast_slice(&vertices),
             usage: wgpu::BufferUsages::VERTEX,
         });
         let index_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-            label: Some(&format!("{} Index Buffer", name)),
+            label: Some(&format!("[Mesh::new] index buffer for {}", name)),
             contents: bytemuck::cast_slice(&indices),
             usage: wgpu::BufferUsages::INDEX,
         });
@@ -109,7 +109,7 @@ impl Material {
                     resource: wgpu::BindingResource::Sampler(normal_texture.sampler()),
                 },
             ],
-            label: Some(name),
+            label: Some(&format!("[Material::new] bind group for {}", name)),
         });
 
         Self { bind_group }

@@ -1,6 +1,11 @@
 ## TODOs
 
 - [ ] FIXME: camera movement is not very smooth.
-- [ ] clean up labels.
-  - They are not very consistent now.
-  - `None`s should be avoided where possible.
+
+## Coding conventions
+
+Function parameter ordering:
+
+- label and name
+- context parameters (e.g., device, queue)
+- other parameters

@@ -9,14 +9,14 @@ pub struct DepthTexture {
 
 #[allow(unused)]
 impl DepthTexture {
-    pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration, label: &str) -> Self {
+    pub fn new(name: &str, device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
         let size = wgpu::Extent3d {
             width: config.width.max(1),
             height: config.height.max(1),
             depth_or_array_layers: 1,
         };
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some(label),
+            label: Some(&format!("[DepthTexture::new] texture for {}", name)),
             size,
             mip_level_count: 1,
             sample_count: 1,
@@ -26,8 +26,12 @@ impl DepthTexture {
             view_formats: &[],
         });
 
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some(&format!("[DepthTexture::new] texture view for {}", name)),
+            ..Default::default()
+        });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some(&format!("[DepthTexture::new] sampler for {}", name)),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -68,14 +72,17 @@ pub struct DepthTextureNonComparisonSampler {
 }
 
 impl DepthTextureNonComparisonSampler {
-    pub fn new(device: &wgpu::Device, size: glam::UVec2, label: &str) -> Self {
+    pub fn new(name: &str, device: &wgpu::Device, size: glam::UVec2) -> Self {
         let size = wgpu::Extent3d {
             width: size.x.max(1),
             height: size.y.max(1),
             depth_or_array_layers: 1,
         };
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label: Some(label),
+            label: Some(&format!(
+                "[DepthTextureNonComparisonSampler::new] texture for {}",
+                name
+            )),
             size,
             mip_level_count: 1,
             sample_count: 1,
@@ -84,8 +91,18 @@ impl DepthTextureNonComparisonSampler {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::TEXTURE_BINDING,
             view_formats: &[DEPTH_FORMAT],
         });
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some(&format!(
+                "[DepthTextureNonComparisonSampler::new] texture view for {}",
+                name
+            )),
+            ..Default::default()
+        });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some(&format!(
+                "[DepthTextureNonComparisonSampler::new] sampler for {}",
+                name
+            )),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,

@@ -69,7 +69,7 @@ impl ComputeShaderComputeEquirectToCubemap {
         opts: ComputePipelineDescriptorPartial<'a>,
     ) -> wgpu::ComputePipelineDescriptor<'a> {
         wgpu::ComputePipelineDescriptor {
-            label: opts.label,
+            label: Some(opts.label),
             layout: opts.layout,
             module: &self.0,
             entry_point: Some("compute_equirect_to_cubemap"),
@@ -80,7 +80,7 @@ impl ComputeShaderComputeEquirectToCubemap {
 }
 
 pub struct ComputePipelineDescriptorPartial<'a> {
-    pub label: Option<&'a str>,
+    pub label: &'a str,
     pub layout: Option<&'a wgpu::PipelineLayout>,
     pub compilation_options: wgpu::PipelineCompilationOptions<'a>,
     pub cache: Option<&'a wgpu::PipelineCache>,
@@ -90,7 +90,7 @@ pub struct ComputePipelineDescriptorPartial<'a> {
 macro include_wesl_desc($($token:tt)*) {
     {
         wgpu::ShaderModuleDescriptor {
-            label: Some($($token)*),
+            label: Some(concat!("[.wesl] ", $($token)*)),
             source: wgpu::ShaderSource::Wgsl(std::borrow::Cow::Borrowed(wesl::include_wesl!($($token)*))),
         }
     }

@@ -31,7 +31,7 @@ impl ModelSystem {
     ) -> Self {
         let pipeline_simple = {
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Render Pipeline Layout"),
+                label: Some("[ModelSystem::new] render pipeline layout for simple models"),
                 bind_group_layouts: &[
                     texture_bind_group_layout,
                     camera_sys.bind_group_layout(),
@@ -41,7 +41,7 @@ impl ModelSystem {
                 push_constant_ranges: &[],
             });
             make_render_pipeline(
-                "main",
+                "[ModelSystem::new] render pipeline for simple models",
                 device,
                 &layout,
                 color_format,
@@ -54,7 +54,9 @@ impl ModelSystem {
 
         let pipeline_light_source_indicator = {
             let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                label: Some("Light Pipeline Layout"),
+                label: Some(
+                    "[ModelSystem::new] render pipeline layout for light source indicators",
+                ),
                 bind_group_layouts: &[
                     camera_sys.bind_group_layout(),
                     light_sys.bind_group_layout(),
@@ -62,7 +64,7 @@ impl ModelSystem {
                 push_constant_ranges: &[],
             });
             make_render_pipeline(
-                "light",
+                "[ModelSystem::new] render pipeline for light source indicators",
                 device,
                 &layout,
                 color_format,

@@ -76,7 +76,7 @@ impl App {
 
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                label: None,
+                label: Some("[App::try_new]"),
                 required_features: wgpu::Features::empty(),
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 required_limits: wgpu::Limits::defaults(),
@@ -87,25 +87,28 @@ impl App {
 
         let canvas_sys = CanvasSystem::new(surface, &adapter, &device, size);
 
-        let texture_bind_group_layout =
-            textures::make_regular_d2_texture_bind_group_layout(&device);
+        let texture_bind_group_layout = textures::make_regular_d2_texture_bind_group_layout(
+            "[App::try_new] texture bind group layout",
+            &device,
+        );
 
         let camera_sys = CameraSystem::new(&device, size);
         let camera_controller = CameraController::new(4.0, 0.4);
 
         let light_sys = LightSystem::new(&device);
 
-        let sky_res_loader = EmbedFsAccessor::<embedded_demo_resources::ResSky>::new("sky");
-        let sky_bytes = sky_res_loader.load_binary("pure-sky.hdr")?;
         let cube_texture_factory = textures::CubeTextureFactory::new(&device);
-        let sky_texture = cube_texture_factory
-            .try_make_cube_texture_from_equirectangular_hdr_image_in_memory(
-                &device,
-                &queue,
-                &sky_bytes,
-                1080,
-                "Sky Texture",
-            )?;
+
+        let sky_texture = {
+            const FILE_NAME: &str = "pure-sky.hdr";
+
+            let sky_res_loader = EmbedFsAccessor::<embedded_demo_resources::ResSky>::new("sky");
+            let sky_bytes = sky_res_loader.load_binary(FILE_NAME)?;
+
+            cube_texture_factory.try_make_cube_texture_from_equirectangular_hdr_image_in_memory(
+                FILE_NAME, &device, &queue, &sky_bytes, 1080,
+            )?
+        };
 
         let skybox_sys = SkyboxSystem::new(&device, sky_texture, &canvas_sys, &camera_sys);
 
@@ -216,12 +219,12 @@ impl App {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
+                label: Some("[App::render] render encoder"),
             });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("Render Pass"),
+                label: Some("[App::render] render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: self.canvas_sys.canvas_view(),
                     depth_slice: None,

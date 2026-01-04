@@ -16,16 +16,16 @@ pub(super) struct D2Texture<T: super::TextureFormat> {
 
 impl<T: super::TextureFormat> D2Texture<T> {
     pub fn from_pixel_buffer(
+        name: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         dimensions: (u32, u32),
         pixel_buffer: &[u8],
-        label: Option<&str>,
         is_color_map: bool,
     ) -> Self {
         let texture = Self::new(
+            name,
             device,
-            label,
             NewD2TextureOptions {
                 is_color_map,
                 size: dimensions.into(),
@@ -53,7 +53,7 @@ impl<T: super::TextureFormat> D2Texture<T> {
         texture
     }
 
-    pub fn new(device: &wgpu::Device, label: Option<&str>, opts: NewD2TextureOptions) -> Self {
+    pub fn new(name: &str, device: &wgpu::Device, opts: NewD2TextureOptions) -> Self {
         let format = if opts.is_color_map {
             T::srgb()
         } else {
@@ -61,7 +61,7 @@ impl<T: super::TextureFormat> D2Texture<T> {
         };
 
         let texture = device.create_texture(&wgpu::TextureDescriptor {
-            label,
+            label: Some(&format!("[D2Texture::new] texture for {}", name)),
             size: wgpu::Extent3d {
                 width: opts.size.x,
                 height: opts.size.y,
@@ -75,8 +75,12 @@ impl<T: super::TextureFormat> D2Texture<T> {
             view_formats: &[format.add_srgb_suffix()],
         });
 
-        let view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+        let view = texture.create_view(&wgpu::TextureViewDescriptor {
+            label: Some(&format!("[D2Texture::new] texture view for {}", name)),
+            ..Default::default()
+        });
         let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+            label: Some(&format!("[D2Texture::new] sampler for {}", name)),
             address_mode_u: wgpu::AddressMode::ClampToEdge,
             address_mode_v: wgpu::AddressMode::ClampToEdge,
             address_mode_w: wgpu::AddressMode::ClampToEdge,
@@ -95,28 +99,28 @@ impl<T: super::TextureFormat> D2Texture<T> {
     }
 
     pub fn from_image_in_memory(
+        name: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         bytes: &[u8],
-        label: &str,
         is_color_map: bool,
     ) -> anyhow::Result<Self> {
         let img = image::load_from_memory(bytes)?;
-        let texture = Self::from_image(device, queue, &img, Some(label), is_color_map);
+        let texture = Self::from_image(name, device, queue, &img, is_color_map);
         Ok(texture)
     }
 
     pub fn from_image(
+        name: &str,
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         img: &image::DynamicImage,
-        label: Option<&str>,
         is_color_map: bool,
     ) -> Self {
         let rgba = T::image_into_bytes(img.clone());
         let dimensions = img.dimensions();
 
-        Self::from_pixel_buffer(device, queue, dimensions, &rgba, label, is_color_map)
+        Self::from_pixel_buffer(name, device, queue, dimensions, &rgba, is_color_map)
     }
 
     pub fn texture(&self) -> &wgpu::Texture {
