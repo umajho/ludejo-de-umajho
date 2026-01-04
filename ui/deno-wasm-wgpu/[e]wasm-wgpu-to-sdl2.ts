@@ -6,7 +6,7 @@ import { setProcessTitle } from "./shared/init.ts";
 
 import { SDL_WINDOWEVENT_RESIZED, SDL_WINDOWEVENT_SIZE_CHANGED } from "./shared/sdl.ts";
 
-import init, * as w from "./crates/learn_wgpu_tutorial/dist-web-manual/learn_wgpu_tutorial.js";
+import init, * as w from "./vendor/ab3de_engine/dist-web-manual/learn_wgpu_tutorial.js";
 
 setProcessTitle("deno-wasm-wgpu-b");
 

@@ -3,6 +3,31 @@
 version = 4
 
 [[package]]
+name = "ab3de_engine"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "console_error_panic_hook",
+ "console_log",
+ "env_logger",
+ "glam",
+ "image",
+ "log",
+ "mmd",
+ "pollster",
+ "rust-embed",
+ "tobj",
+ "trig-const",
+ "wasm-bindgen",
+ "wasm-bindgen-futures",
+ "web-sys",
+ "wesl",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "ab_glyph"
 version = "0.2.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1169,31 +1194,6 @@ checksum = "b5baa5e9ff84f1aefd264e6869907646538a52147a755d494517a8007fb48733"
 dependencies = [
  "regex-automata",
  "rustversion",
-]
-
-[[package]]
-name = "learn_wgpu_tutorial"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "console_error_panic_hook",
- "console_log",
- "env_logger",
- "glam",
- "image",
- "log",
- "mmd",
- "pollster",
- "rust-embed",
- "tobj",
- "trig-const",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "wesl",
- "wgpu",
- "winit",
 ]
 
 [[package]]
