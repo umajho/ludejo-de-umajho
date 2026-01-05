@@ -26,11 +26,7 @@ pub fn run_winit() -> anyhow::Result<()> {
     let init: ApplicationInit = Box::new(|surface_target, ctx, size| {
         Box::pin(App::try_new_as_boxed_handler(surface_target, ctx, size))
     });
-    let mut handler = WinitWindowHandler::new(
-        init,
-        #[cfg(target_arch = "wasm32")]
-        &event_loop,
-    );
+    let mut handler = WinitWindowHandler::new(init);
 
     event_loop.run_app(&mut handler)?;
 
@@ -41,17 +37,6 @@ pub fn run_winit() -> anyhow::Result<()> {
 pub fn run_native_winit() -> anyhow::Result<()> {
     env_logger::init();
     run_winit()
-}
-
-#[cfg(all(target_arch = "wasm32", feature = "wasm-winit"))]
-#[wasm_bindgen(start)]
-pub fn run_web_winit() -> Result<(), wasm_bindgen::JsValue> {
-    console_error_panic_hook::set_once();
-    console_log::init_with_level(log::Level::Debug).unwrap_throw();
-
-    run_winit().unwrap_throw();
-
-    Ok(())
 }
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm-weblike-manual"))]

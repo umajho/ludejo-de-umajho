@@ -1,10 +1,5 @@
 use std::sync::Arc;
 
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-
-#[cfg(target_arch = "wasm32")]
-use winit::event_loop::EventLoop;
 use winit::{
     application::ApplicationHandler,
     event::{DeviceEvent, DeviceId, WindowEvent},
@@ -18,17 +13,8 @@ use crate::io::window_handling::{
 };
 
 pub struct WinitWindowHandler {
-    #[cfg(target_arch = "wasm32")]
-    proxy: Option<winit::event_loop::EventLoopProxy<UserEvent>>,
-
     state: State,
     window: Option<Arc<Window>>,
-}
-
-#[allow(unused)]
-pub struct UserEvent {
-    inner_handler: Application,
-    window: Arc<Window>,
 }
 
 enum State {
@@ -37,21 +23,15 @@ enum State {
 }
 
 impl WinitWindowHandler {
-    pub fn new(
-        init: ApplicationInit,
-        #[cfg(target_arch = "wasm32")] event_loop: &EventLoop<UserEvent>,
-    ) -> Self {
+    pub fn new(init: ApplicationInit) -> Self {
         Self {
-            #[cfg(target_arch = "wasm32")]
-            proxy: Some(event_loop.create_proxy()),
-
             state: State::Uninitialized(Some(init)),
             window: None,
         }
     }
 }
 
-impl ApplicationHandler<UserEvent> for WinitWindowHandler {
+impl ApplicationHandler for WinitWindowHandler {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         let State::Uninitialized(init) = &mut self.state else {
             return;
@@ -61,22 +41,7 @@ impl ApplicationHandler<UserEvent> for WinitWindowHandler {
             return;
         };
 
-        #[allow(unused_mut)]
-        let mut window_attributes = winit::window::WindowAttributes::default();
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            use wasm_bindgen::JsCast;
-            use winit::platform::web::WindowAttributesExtWebSys;
-
-            const CANVAS_ID: &str = "canvas";
-
-            let window = wgpu::web_sys::window().unwrap_throw();
-            let document = window.document().unwrap_throw();
-            let canvas = document.get_element_by_id(CANVAS_ID).unwrap_throw();
-            let html_canvas_element = canvas.unchecked_into();
-            window_attributes = window_attributes.with_canvas(Some(html_canvas_element));
-        }
+        let window_attributes = winit::window::WindowAttributes::default();
 
         let window = Arc::new(event_loop.create_window(window_attributes).unwrap());
         self.window = Some(window.clone());
@@ -87,31 +52,8 @@ impl ApplicationHandler<UserEvent> for WinitWindowHandler {
             window: window.clone(),
         });
 
-        cfg_select! {
-          target_arch = "wasm32" => {
-            if let Some(proxy) = self.proxy.take() {
-                wasm_bindgen_futures::spawn_local(async move {
-                    let inner_handler = (init)(window.clone().into(), ctx, size).await;
-                    let inner_handler = inner_handler.unwrap();
-                    assert!(proxy.send_event(UserEvent { inner_handler, window }).is_ok())
-                })
-            }
-          }
-          _ => {
-            let inner_handler_future = (init)(window.into(), ctx, size);
-            self.state = State::Ready(pollster::block_on(inner_handler_future).unwrap());
-          }
-        }
-    }
-
-    #[cfg(target_arch = "wasm32")]
-    fn user_event(&mut self, _event_loop: &ActiveEventLoop, mut user_event: UserEvent) {
-        user_event.inner_handler.handle_redraw_requested();
-        let size = user_event.window.inner_size();
-        user_event
-            .inner_handler
-            .handle_resized((size.width, size.height));
-        self.state = State::Ready(user_event.inner_handler);
+        let inner_handler_future = (init)(window.into(), ctx, size);
+        self.state = State::Ready(pollster::block_on(inner_handler_future).unwrap());
     }
 
     fn device_event(

@@ -8,7 +8,6 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 native-winit = []
-wasm-winit = []
 wasm-weblike-manual = []
 
 # default = ["native-winit"]

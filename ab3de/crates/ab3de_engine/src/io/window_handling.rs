@@ -2,7 +2,7 @@ use std::pin::Pin;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm-weblike-manual"))]
 pub mod weblike_manual;
-#[cfg(any(feature = "native-winit", feature = "wasm-winit"))]
+#[cfg(feature = "native-winit")]
 pub mod winit;
 
 pub trait SimpleApplicationEventHandler {

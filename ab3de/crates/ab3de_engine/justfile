@@ -1,7 +1,4 @@
-web-winit-build:
-  wasm-pack build --target web . --out-dir dist-web-winit -- --features wasm-winit
-
-web-manual-build:
+web-build:
   wasm-pack build --target web . --out-dir dist-web-manual -- --features wasm-weblike-manual
 
 web-serve:
