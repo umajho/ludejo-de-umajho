@@ -196,10 +196,6 @@ impl Engine {
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         self.ctx.request_redraw();
 
-        if !self.viewport.is_ready() {
-            return Ok(());
-        }
-
         let encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
@@ -296,10 +292,6 @@ impl Viewport {
 
     fn update_camera(&mut self, queue: &wgpu::Queue, f: impl FnOnce(&mut CameraData)) {
         self.camera_entry.update_camera(queue, f);
-    }
-
-    fn is_ready(&self) -> bool {
-        self.canvas_entry.is_ready()
     }
 
     fn render(

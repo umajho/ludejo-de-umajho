@@ -5,7 +5,6 @@ pub const CANVAS_COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16
 pub struct CanvasEntry {
     surface: wgpu::Surface<'static>,
     surface_config: wgpu::SurfaceConfiguration,
-    is_surface_configured: bool,
 
     canvas: HdrToneMappingCanvas,
 }
@@ -36,12 +35,13 @@ impl CanvasEntry {
             desired_maximum_frame_latency: 2,
         };
 
+        surface.configure(device, &config);
+
         let canvas = HdrToneMappingCanvas::new(device, &config);
 
         Self {
             surface,
             surface_config: config,
-            is_surface_configured: false,
             canvas,
         }
     }
@@ -50,13 +50,8 @@ impl CanvasEntry {
         self.surface_config.width = width;
         self.surface_config.height = height;
         self.surface.configure(device, &self.surface_config);
-        self.is_surface_configured = true;
 
         self.canvas.resize(device, width, height);
-    }
-
-    pub fn is_ready(&self) -> bool {
-        self.is_surface_configured
     }
 
     pub fn surface_config(&self) -> &wgpu::SurfaceConfiguration {
