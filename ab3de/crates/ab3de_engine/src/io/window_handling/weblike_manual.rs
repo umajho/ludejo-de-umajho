@@ -7,42 +7,108 @@ use web_sys::{
 };
 
 use crate::{
-    engine::Engine,
-    io::window_handling::{
-        ApplicationContext, ElementState, Input, KeyCode, MouseScrollDelta, PhysicalKey,
-        SimpleApplicationEventHandler,
-    },
+    camera_controller::{CameraController, CameraControllerInput},
+    engine::{Engine, Viewport},
+    io::window_handling::{ElementState, KeyCode, MouseScrollDelta, PhysicalKey},
+    utils,
 };
 
 pub struct WeblikeManualWindowHandler {
+    ctx: WeblikeManualApplicationContext,
+
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+
     engine: Engine,
+    viewport: Viewport,
+    camera_controller: CameraController,
+
+    update_time_ms: u64,
 }
 
 impl WeblikeManualWindowHandler {
     pub async fn new(canvas: OffscreenCanvas) -> Self {
         let surface_target = wgpu::SurfaceTarget::OffscreenCanvas(canvas.clone());
-        let ctx = Box::new(WeblikeManualApplicationContext::new(canvas.clone()));
+        let ctx = WeblikeManualApplicationContext::new(canvas.clone());
         let size = glam::uvec2(canvas.width(), canvas.height());
 
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::PRIMARY,
+            ..Default::default()
+        });
+
+        let surface = instance.create_surface(surface_target).unwrap_throw();
+
+        let adapter = instance
+            .request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            })
+            .await
+            .unwrap_throw();
+
+        let (device, queue) = adapter
+            .request_device(&wgpu::DeviceDescriptor {
+                label: Some("[ApplicationHandler::resumed]"),
+                required_features: wgpu::Features::empty(),
+                experimental_features: wgpu::ExperimentalFeatures::disabled(),
+                required_limits: wgpu::Limits::defaults(),
+                memory_hints: Default::default(),
+                trace: wgpu::Trace::Off,
+            })
+            .await
+            .unwrap_throw();
+
+        let engine = Engine::try_new(device.clone(), queue.clone()).unwrap_throw();
+
+        let viewport = engine.make_viewport(surface, &adapter, size);
+
         Self {
-            engine: Engine::try_new(surface_target, ctx, size)
-                .await
-                .unwrap_throw(),
+            ctx,
+            device,
+            queue,
+            engine,
+            viewport,
+            camera_controller: CameraController::new(4.0, 0.4),
+            update_time_ms: utils::now_ms(),
         }
     }
 
     pub fn handle_resized(&mut self, width: u32, height: u32) {
-        self.engine.handle_resized((width, height));
+        self.viewport
+            .resize(&self.device, &self.queue, width, height);
     }
 
     pub fn handle_redraw_requested(&mut self) {
-        self.engine.handle_redraw_requested();
+        let last_ms = core::mem::replace(&mut self.update_time_ms, utils::now_ms());
+        let dt_ms = self.update_time_ms - last_ms;
+        let dt_s = dt_ms as f32 / 1000.0;
+
+        self.viewport.update_camera(&self.queue, |camera_data| {
+            self.camera_controller.update_camera(camera_data, dt_s);
+        });
+
+        self.ctx.request_redraw();
+        self.engine.update(self.update_time_ms, dt_s);
+        match self.engine.render(&self.viewport) {
+            Ok(_) => {}
+            Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                let size = self.ctx.window_size();
+                self.viewport
+                    .resize(&self.device, &self.queue, size.0, size.1);
+            }
+            Err(e) => {
+                log::error!("Unable to render {}", e)
+            }
+        }
     }
 
     pub fn handle_input_mouse_motion(&mut self, delta_x: f64, delta_y: f64) {
-        _ = self.engine.handle_input(Input::MouseMotion {
-            delta: (delta_x, delta_y),
-        });
+        self.camera_controller
+            .handle_input(CameraControllerInput::MouseMotion {
+                delta: (delta_x, delta_y),
+            });
     }
 
     pub fn handle_input_keyboard(&mut self, physical_key_code: &str, is_down: bool) {
@@ -66,10 +132,11 @@ impl WeblikeManualWindowHandler {
             ElementState::Released
         };
 
-        _ = self.engine.handle_input(Input::KeyboardInput {
-            physical_key,
-            state,
-        });
+        self.camera_controller
+            .handle_input(CameraControllerInput::KeyboardInput {
+                physical_key,
+                state,
+            });
     }
 
     const WHEEL_EVENT_DOM_DELTA_PIXEL: u8 = 0;
@@ -84,7 +151,8 @@ impl WeblikeManualWindowHandler {
             _ => return,
         };
 
-        _ = self.engine.handle_input(Input::MouseWheel { delta });
+        self.camera_controller
+            .handle_input(CameraControllerInput::MouseWheel { delta });
     }
 
     pub fn handle_input_mouse_input(&mut self, button: u8, is_down: bool) {
@@ -99,9 +167,8 @@ impl WeblikeManualWindowHandler {
             ElementState::Released
         };
 
-        _ = self
-            .engine
-            .handle_input(Input::MouseInput { button, state });
+        self.camera_controller
+            .handle_input(CameraControllerInput::MouseInput { button, state });
     }
 }
 
@@ -129,7 +196,7 @@ impl WeblikeManualApplicationContext {
     }
 }
 
-impl ApplicationContext for WeblikeManualApplicationContext {
+impl WeblikeManualApplicationContext {
     fn request_redraw(&self) {
         self.request_redraw.call0(&self.canvas).unwrap_throw();
     }

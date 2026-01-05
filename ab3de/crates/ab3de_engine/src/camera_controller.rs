@@ -2,7 +2,7 @@ use std::f32::consts::FRAC_PI_2;
 
 use crate::{
     drawing::systems::camera_system::CameraData,
-    io::window_handling::{ElementState, KeyCode, MouseButton, MouseScrollDelta},
+    io::window_handling::{ElementState, KeyCode, MouseButton, MouseScrollDelta, PhysicalKey},
 };
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
@@ -135,6 +135,47 @@ impl CameraController {
             camera_data.pitch_radians = -SAFE_FRAC_PI_2;
         } else if camera_data.pitch_radians > SAFE_FRAC_PI_2 {
             camera_data.pitch_radians = SAFE_FRAC_PI_2;
+        }
+    }
+}
+
+pub enum CameraControllerInput {
+    /// corresponds to [`winit::event::DeviceEvent::MouseMotion`].
+    MouseMotion { delta: (f64, f64) },
+    /// corresponds to [`winit::event::WindowEvent::KeyboardInput`].
+    KeyboardInput {
+        physical_key: PhysicalKey,
+        state: ElementState,
+    },
+    /// corresponds to [`winit::event::WindowEvent::MouseWheel`].
+    MouseWheel { delta: MouseScrollDelta },
+    /// corresponds to [`winit::event::WindowEvent::MouseInput`].
+    MouseInput {
+        button: MouseButton,
+        state: ElementState,
+    },
+}
+
+impl CameraController {
+    pub fn handle_input(&mut self, input: CameraControllerInput) -> bool {
+        match input {
+            CameraControllerInput::MouseMotion { delta } => {
+                self.handle_mouse(delta.0, delta.1);
+                true
+            }
+            CameraControllerInput::KeyboardInput {
+                physical_key: PhysicalKey::Code(key),
+                state,
+            } => self.process_keyboard(key, state),
+            CameraControllerInput::MouseWheel { delta } => {
+                self.handle_mouse_scroll(&delta);
+                true
+            }
+            CameraControllerInput::MouseInput { button, state } => {
+                self.handle_mouse_input(button, state);
+                true
+            }
+            _ => false,
         }
     }
 }

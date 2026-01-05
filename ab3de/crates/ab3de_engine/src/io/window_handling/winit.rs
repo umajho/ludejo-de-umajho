@@ -8,21 +8,32 @@ use winit::{
 };
 
 use crate::{
-    engine::Engine,
-    io::window_handling::{
-        ApplicationContext, ElementState, Input, KeyCode, MouseButton, MouseScrollDelta,
-        PhysicalKey, SimpleApplicationEventHandler,
-    },
+    camera_controller::{CameraController, CameraControllerInput},
+    engine::{Engine, Viewport},
+    io::window_handling::{ElementState, KeyCode, MouseButton, MouseScrollDelta, PhysicalKey},
+    utils,
 };
 
 pub struct WinitWindowHandler {
     state: State,
+
     window: Option<Arc<Window>>,
 }
 
 enum State {
     Uninitialized,
-    Ready(Engine),
+    Ready(StateReady),
+}
+
+struct StateReady {
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+
+    engine: Engine,
+    viewport: Viewport,
+    camera_controller: CameraController,
+
+    update_time_ms: u64,
 }
 
 impl WinitWindowHandler {
@@ -47,13 +58,46 @@ impl ApplicationHandler for WinitWindowHandler {
         let size = window.inner_size();
         let size = (size.width, size.height).into();
 
-        let ctx = Box::new(WinitApplicationContext {
-            window: window.clone(),
+        let instance = wgpu::Instance::new(&wgpu::InstanceDescriptor {
+            backends: wgpu::Backends::PRIMARY,
+            ..Default::default()
         });
 
-        let engine_future = Engine::try_new(window.into(), ctx, size);
-        let engine = pollster::block_on(engine_future).unwrap();
-        self.state = State::Ready(engine);
+        let surface = instance.create_surface(window).unwrap();
+
+        let adapter = {
+            let adapter_future = instance.request_adapter(&wgpu::RequestAdapterOptions {
+                power_preference: wgpu::PowerPreference::default(),
+                compatible_surface: Some(&surface),
+                force_fallback_adapter: false,
+            });
+            pollster::block_on(adapter_future).unwrap()
+        };
+
+        let (device, queue) = {
+            let device_future = adapter.request_device(&wgpu::DeviceDescriptor {
+                label: Some("[ApplicationHandler::resumed]"),
+                required_features: wgpu::Features::empty(),
+                experimental_features: wgpu::ExperimentalFeatures::disabled(),
+                required_limits: wgpu::Limits::defaults(),
+                memory_hints: Default::default(),
+                trace: wgpu::Trace::Off,
+            });
+            pollster::block_on(device_future).unwrap()
+        };
+
+        let engine = Engine::try_new(device.clone(), queue.clone()).unwrap();
+
+        let viewport = engine.make_viewport(surface, &adapter, size);
+
+        self.state = State::Ready(StateReady {
+            device,
+            queue,
+            engine,
+            viewport,
+            camera_controller: CameraController::new(4.0, 0.4),
+            update_time_ms: utils::now_ms(),
+        });
     }
 
     fn device_event(
@@ -62,13 +106,15 @@ impl ApplicationHandler for WinitWindowHandler {
         _device_id: DeviceId,
         event: DeviceEvent,
     ) {
-        let engine = match &mut self.state {
-            State::Ready(engine) => engine,
+        let s = match &mut self.state {
+            State::Ready(state) => state,
             _ => return,
         };
 
         let _has_consumed = match event {
-            DeviceEvent::MouseMotion { delta } => engine.handle_input(Input::MouseMotion { delta }),
+            DeviceEvent::MouseMotion { delta } => s
+                .camera_controller
+                .handle_input(CameraControllerInput::MouseMotion { delta }),
             _ => false,
         };
     }
@@ -79,8 +125,8 @@ impl ApplicationHandler for WinitWindowHandler {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let engine = match &mut self.state {
-            State::Ready(engine) => engine,
+        let s = match &mut self.state {
+            State::Ready(state) => state,
             _ => return,
         };
 
@@ -93,18 +139,25 @@ impl ApplicationHandler for WinitWindowHandler {
         }
 
         let has_consumed = match &event {
-            WindowEvent::KeyboardInput { event, .. } => engine.handle_input(Input::KeyboardInput {
-                physical_key: event.physical_key.into(),
-                state: event.state.into(),
-            }),
-            WindowEvent::MouseWheel { delta, .. } => engine.handle_input(Input::MouseWheel {
-                delta: (*delta).into(),
-            }),
+            WindowEvent::KeyboardInput { event, .. } => {
+                s.camera_controller
+                    .handle_input(CameraControllerInput::KeyboardInput {
+                        physical_key: event.physical_key.into(),
+                        state: event.state.into(),
+                    })
+            }
+            WindowEvent::MouseWheel { delta, .. } => {
+                s.camera_controller
+                    .handle_input(CameraControllerInput::MouseWheel {
+                        delta: (*delta).into(),
+                    })
+            }
             WindowEvent::MouseInput { button, state, .. } => {
-                engine.handle_input(Input::MouseInput {
-                    button: (*button).into(),
-                    state: (*state).into(),
-                })
+                s.camera_controller
+                    .handle_input(CameraControllerInput::MouseInput {
+                        button: (*button).into(),
+                        state: (*state).into(),
+                    })
             }
             _ => false,
         };
@@ -127,28 +180,35 @@ impl ApplicationHandler for WinitWindowHandler {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
-                engine.handle_resized((size.width, size.height));
+                s.viewport
+                    .resize(&s.device, &s.queue, size.width, size.height);
             }
             WindowEvent::RedrawRequested => {
-                engine.handle_redraw_requested();
+                let last_ms = core::mem::replace(&mut s.update_time_ms, utils::now_ms());
+                let dt_ms = s.update_time_ms - last_ms;
+                let dt_s = dt_ms as f32 / 1000.0;
+
+                s.viewport.update_camera(&s.queue, |camera_data| {
+                    s.camera_controller.update_camera(camera_data, dt_s);
+                });
+
+                window.request_redraw();
+                s.engine.update(s.update_time_ms, dt_s);
+
+                match s.engine.render(&s.viewport) {
+                    Ok(_) => {}
+                    Err(wgpu::SurfaceError::Lost | wgpu::SurfaceError::Outdated) => {
+                        let size = window.inner_size();
+                        s.viewport
+                            .resize(&s.device, &s.queue, size.width, size.height);
+                    }
+                    Err(e) => {
+                        log::error!("Unable to render {}", e)
+                    }
+                }
             }
             _ => {}
         }
-    }
-}
-
-struct WinitApplicationContext {
-    window: Arc<Window>,
-}
-
-impl ApplicationContext for WinitApplicationContext {
-    fn request_redraw(&self) {
-        self.window.request_redraw();
-    }
-
-    fn window_size(&self) -> (u32, u32) {
-        let size = self.window.inner_size();
-        (size.width, size.height)
     }
 }
 
