@@ -50,15 +50,9 @@
       ) {
         const resizeObserver = new ResizeObserver((entries) => {
           for (const entry of entries) {
-            const width = entry.contentRect.width;
-            const height = entry.contentRect.height;
-            offscreenCanvas.width = width * devicePixelRatio;
-            offscreenCanvas.height = height * devicePixelRatio;
-            client.command(
-              "handle_resized",
-              offscreenCanvas.width,
-              offscreenCanvas.height,
-            );
+            const width = entry.contentRect.width * devicePixelRatio;
+            const height = entry.contentRect.height * devicePixelRatio;
+            client.command("handle_resized", width, height);
           }
         });
         resizeObserver.observe(canvas);
