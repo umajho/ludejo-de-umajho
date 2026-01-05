@@ -26,13 +26,16 @@ onmessage = async (ev) => {
       runner[name](...args);
       break;
     }
-    case "tick_frame": {
-      if (hasRequestedRedraw) {
-        hasRequestedRedraw = false;
-        runner.handle_redraw_requested();
-      }
-    }
   }
 };
+
+const tickFrame = () => {
+  if (hasRequestedRedraw) {
+    hasRequestedRedraw = false;
+    runner.handle_redraw_requested();
+  }
+  requestAnimationFrame(tickFrame);
+};
+tickFrame();
 
 postMessage("ready");

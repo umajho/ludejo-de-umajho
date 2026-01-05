@@ -125,7 +125,6 @@
             throw new Error("`start` has already been called.");
           }
           this.#hasCalledStart = true;
-          this.#startFrameTicking();
           return new Promise((resolve) => {
             const cb = (ev) => {
               if (ev.data === "started") {
@@ -139,14 +138,6 @@
               [offscreenCanvas],
             );
           });
-        }
-
-        #startFrameTicking() {
-          const postTick = () => {
-            this.#worker.postMessage(["tick_frame"]);
-            requestAnimationFrame(postTick);
-          };
-          requestAnimationFrame(postTick);
         }
 
         command(name, ...args) {
