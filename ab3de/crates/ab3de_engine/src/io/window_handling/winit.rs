@@ -7,9 +7,12 @@ use winit::{
     window::{Window, WindowId},
 };
 
-use crate::io::window_handling::{
-    Application, ApplicationContext, ApplicationInit, ElementState, Input, KeyCode, MouseButton,
-    MouseScrollDelta, PhysicalKey,
+use crate::{
+    app::App,
+    io::window_handling::{
+        ApplicationContext, ElementState, Input, KeyCode, MouseButton, MouseScrollDelta,
+        PhysicalKey, SimpleApplicationEventHandler,
+    },
 };
 
 pub struct WinitWindowHandler {
@@ -18,14 +21,14 @@ pub struct WinitWindowHandler {
 }
 
 enum State {
-    Uninitialized(Option<ApplicationInit>),
-    Ready(Application),
+    Uninitialized,
+    Ready(App),
 }
 
 impl WinitWindowHandler {
-    pub fn new(init: ApplicationInit) -> Self {
+    pub fn new() -> Self {
         Self {
-            state: State::Uninitialized(Some(init)),
+            state: State::Uninitialized,
             window: None,
         }
     }
@@ -33,11 +36,7 @@ impl WinitWindowHandler {
 
 impl ApplicationHandler for WinitWindowHandler {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let State::Uninitialized(init) = &mut self.state else {
-            return;
-        };
-        let init = init.take();
-        let Some(init) = init else {
+        let State::Uninitialized = &mut self.state else {
             return;
         };
 
@@ -52,8 +51,9 @@ impl ApplicationHandler for WinitWindowHandler {
             window: window.clone(),
         });
 
-        let inner_handler_future = (init)(window.into(), ctx, size);
-        self.state = State::Ready(pollster::block_on(inner_handler_future).unwrap());
+        let inner_handler_future = App::try_new(window.into(), ctx, size);
+        let inner_handler = pollster::block_on(inner_handler_future).unwrap();
+        self.state = State::Ready(inner_handler);
     }
 
     fn device_event(

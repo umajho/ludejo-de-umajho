@@ -46,14 +46,6 @@ pub struct App {
 }
 
 impl App {
-    pub async fn try_new_as_boxed_handler(
-        surface_target: wgpu::SurfaceTarget<'static>,
-        ctx: Box<dyn ApplicationContext>,
-        size: glam::UVec2,
-    ) -> anyhow::Result<Box<dyn SimpleApplicationEventHandler>> {
-        Ok(Box::new(Self::try_new(surface_target, ctx, size).await?))
-    }
-
     pub async fn try_new(
         surface_target: wgpu::SurfaceTarget<'static>,
         ctx: Box<dyn ApplicationContext>,

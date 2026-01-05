@@ -6,23 +6,26 @@ use web_sys::{
     js_sys::{Function, Reflect},
 };
 
-use crate::io::window_handling::{
-    ApplicationContext, ApplicationInit, ElementState, Input, KeyCode, MouseScrollDelta,
-    PhysicalKey, SimpleApplicationEventHandler,
+use crate::{
+    app::App,
+    io::window_handling::{
+        ApplicationContext, ElementState, Input, KeyCode, MouseScrollDelta, PhysicalKey,
+        SimpleApplicationEventHandler,
+    },
 };
 
 pub struct WeblikeManualWindowHandler {
-    app: Box<dyn SimpleApplicationEventHandler>,
+    app: App,
 }
 
 impl WeblikeManualWindowHandler {
-    pub async fn new(canvas: OffscreenCanvas, init: ApplicationInit) -> Self {
+    pub async fn new(canvas: OffscreenCanvas) -> Self {
         let surface_target = wgpu::SurfaceTarget::OffscreenCanvas(canvas.clone());
         let ctx = Box::new(WeblikeManualApplicationContext::new(canvas.clone()));
         let size = glam::uvec2(canvas.width(), canvas.height());
 
         Self {
-            app: (init)(surface_target, ctx, size).await.unwrap_throw(),
+            app: App::try_new(surface_target, ctx, size).await.unwrap_throw(),
         }
     }
 

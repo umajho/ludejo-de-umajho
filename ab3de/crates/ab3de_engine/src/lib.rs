@@ -14,19 +14,12 @@ use wasm_bindgen::prelude::*;
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm-weblike-manual"))]
 use crate::io::window_handling::weblike_manual::WeblikeManualWindowHandler;
-use crate::{
-    app::App,
-    drawing::textures,
-    io::window_handling::{ApplicationInit, winit::WinitWindowHandler},
-};
+use crate::{drawing::textures, io::window_handling::winit::WinitWindowHandler};
 
 pub fn run_winit() -> anyhow::Result<()> {
     let event_loop = winit::event_loop::EventLoop::with_user_event().build()?;
 
-    let init: ApplicationInit = Box::new(|surface_target, ctx, size| {
-        Box::pin(App::try_new_as_boxed_handler(surface_target, ctx, size))
-    });
-    let mut handler = WinitWindowHandler::new(init);
+    let mut handler = WinitWindowHandler::new();
 
     event_loop.run_app(&mut handler)?;
 
@@ -82,13 +75,7 @@ impl Runner {
         let ret;
         (self.state, ret) = match core::mem::replace(&mut self.state, RunerState::Invalid) {
             RunerState::NotStarted(canvas) => {
-                let handler = WeblikeManualWindowHandler::new(
-                    canvas,
-                    Box::new(|surface_target, ctx, size| {
-                        Box::pin(App::try_new_as_boxed_handler(surface_target, ctx, size))
-                    }),
-                )
-                .await;
+                let handler = WeblikeManualWindowHandler::new(canvas).await;
 
                 (RunerState::Started(handler), Ok(()))
             }
