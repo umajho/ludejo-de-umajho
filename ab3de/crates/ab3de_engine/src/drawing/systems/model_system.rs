@@ -6,7 +6,9 @@ use crate::drawing::{
     models::{Material, Mesh, Model, ModelVertex},
     shaders,
     systems::{
-        camera_system::CameraSystem, light_system::LightSystem, skybox_system::SkyboxSystem,
+        camera_system::{CameraEntry, CameraSystem},
+        light_system::LightSystem,
+        skybox_system::SkyboxSystem,
     },
     textures,
     utils::make_render_pipeline,
@@ -92,7 +94,7 @@ impl ModelSystem {
     pub fn draw(
         &mut self,
         render_pass: &mut wgpu::RenderPass<'_>,
-        camera_sys: &CameraSystem,
+        camera_entry: &CameraEntry,
         light_sys: &LightSystem,
         skybox_sys: &SkyboxSystem,
     ) {
@@ -100,7 +102,7 @@ impl ModelSystem {
             entry.draw(
                 render_pass,
                 &self.pipeline_simple,
-                camera_sys,
+                camera_entry,
                 light_sys,
                 skybox_sys,
             );
@@ -110,7 +112,7 @@ impl ModelSystem {
             entry.draw(
                 render_pass,
                 &self.pipeline_light_source_indicator,
-                camera_sys,
+                camera_entry,
                 light_sys,
             );
         }
@@ -171,7 +173,7 @@ impl ModelEntrySimple {
         &mut self,
         render_pass: &mut wgpu::RenderPass<'_>,
         pipeline: &wgpu::RenderPipeline,
-        camera_sys: &CameraSystem,
+        camera_entry: &CameraEntry,
         light_sys: &LightSystem,
         skybox_sys: &SkyboxSystem,
     ) {
@@ -186,7 +188,7 @@ impl ModelEntrySimple {
                 mesh,
                 material,
                 0..self.instances_provider.instance_count() as u32,
-                camera_sys,
+                camera_entry,
                 light_sys,
                 skybox_sys,
             );
@@ -198,14 +200,14 @@ impl ModelEntrySimple {
         mesh: &Mesh,
         material: &Material,
         instance_range: Range<u32>,
-        camera_sys: &CameraSystem,
+        camera_entry: &CameraEntry,
         light_sys: &LightSystem,
         skybox_sys: &SkyboxSystem,
     ) {
         render_pass.set_vertex_buffer(0, mesh.vertex_buffer().slice(..));
         render_pass.set_index_buffer(mesh.index_buffer().slice(..), wgpu::IndexFormat::Uint32);
         render_pass.set_bind_group(0, material.bind_group(), &[]);
-        render_pass.set_bind_group(1, camera_sys.entry().bind_group(), &[]);
+        render_pass.set_bind_group(1, camera_entry.bind_group(), &[]);
         render_pass.set_bind_group(2, light_sys.entry_demo().bind_group(), &[]);
         render_pass.set_bind_group(3, skybox_sys.environment_bind_group(), &[]);
         render_pass.draw_indexed(0..mesh.index_count(), 0, instance_range);
@@ -243,23 +245,23 @@ impl ModelEntryLightSourceIndicator {
         &mut self,
         render_pass: &mut wgpu::RenderPass<'_>,
         pipeline: &wgpu::RenderPipeline,
-        camera_sys: &CameraSystem,
+        camera_entry: &CameraEntry,
         light_sys: &LightSystem,
     ) {
         render_pass.set_pipeline(pipeline);
 
-        Self::draw_light_mesh(render_pass, &self.mesh, camera_sys, light_sys);
+        Self::draw_light_mesh(render_pass, &self.mesh, camera_entry, light_sys);
     }
 
     fn draw_light_mesh(
         render_pass: &mut wgpu::RenderPass<'_>,
         mesh: &Mesh,
-        camera_sys: &CameraSystem,
+        camera_entry: &CameraEntry,
         light_sys: &LightSystem,
     ) {
         render_pass.set_vertex_buffer(0, mesh.vertex_buffer().slice(..));
         render_pass.set_index_buffer(mesh.index_buffer().slice(..), wgpu::IndexFormat::Uint32);
-        render_pass.set_bind_group(0, camera_sys.entry().bind_group(), &[]);
+        render_pass.set_bind_group(0, camera_entry.bind_group(), &[]);
         render_pass.set_bind_group(1, light_sys.entry_demo().bind_group(), &[]);
         render_pass.draw_indexed(0..mesh.index_count(), 0, 0..1);
     }

@@ -1,13 +1,11 @@
 use wgpu::util::DeviceExt;
 
 pub struct CameraSystem {
-    entry: CameraEntry,
-
     bind_group_layout: wgpu::BindGroupLayout,
 }
 
 impl CameraSystem {
-    pub fn new(device: &wgpu::Device, size: glam::UVec2) -> Self {
+    pub fn new(device: &wgpu::Device) -> Self {
         let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             entries: &[wgpu::BindGroupLayoutEntry {
                 binding: 0,
@@ -22,24 +20,15 @@ impl CameraSystem {
             label: Some("[CameraSystem::new] bind group layout for camera"),
         });
 
-        let entry = CameraEntry::new(device, size, &bind_group_layout);
-
-        Self {
-            entry,
-            bind_group_layout,
-        }
-    }
-
-    pub fn entry(&self) -> &CameraEntry {
-        &self.entry
-    }
-
-    pub fn entry_mut(&mut self) -> &mut CameraEntry {
-        &mut self.entry
+        Self { bind_group_layout }
     }
 
     pub fn bind_group_layout(&self) -> &wgpu::BindGroupLayout {
         &self.bind_group_layout
+    }
+
+    pub fn make_entry(&self, device: &wgpu::Device, size: glam::UVec2) -> CameraEntry {
+        CameraEntry::new(device, size, &self.bind_group_layout)
     }
 }
 

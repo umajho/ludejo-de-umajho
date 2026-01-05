@@ -1,8 +1,8 @@
 use crate::drawing::{shaders, textures, utils::make_render_pipeline};
 
-const CANVAS_COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
+pub const CANVAS_COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
-pub struct CanvasSystem {
+pub struct CanvasEntry {
     surface: wgpu::Surface<'static>,
     surface_config: wgpu::SurfaceConfiguration,
     is_surface_configured: bool,
@@ -10,7 +10,7 @@ pub struct CanvasSystem {
     canvas: HdrToneMappingCanvas,
 }
 
-impl CanvasSystem {
+impl CanvasEntry {
     pub fn new(
         surface: wgpu::Surface<'static>,
         adapter: &wgpu::Adapter,
@@ -67,12 +67,8 @@ impl CanvasSystem {
         self.canvas.view()
     }
 
-    pub fn canvas_color_format(&self) -> wgpu::TextureFormat {
-        CANVAS_COLOR_FORMAT
-    }
-
     pub fn try_do_render_pass_and_present(
-        &mut self,
+        &self,
         queue: &wgpu::Queue,
         mut encoder: wgpu::CommandEncoder,
         additional: impl FnOnce(&mut wgpu::CommandEncoder, wgpu::TextureView) -> (),

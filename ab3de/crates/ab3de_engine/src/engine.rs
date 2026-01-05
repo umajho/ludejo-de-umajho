@@ -4,9 +4,9 @@ use crate::{
     camera_controller::CameraController,
     drawing::{
         systems::{
-            camera_system::CameraSystem,
-            canvas_system::CanvasSystem,
-            depth_system::DepthSystem,
+            camera_system::{CameraData, CameraEntry, CameraSystem},
+            canvas_system::{CANVAS_COLOR_FORMAT, CanvasEntry},
+            depth_system::DepthEntry,
             light_system::LightSystem,
             model_system::{
                 ModelEntryLightSourceIndicator, ModelEntrySimple, ModelSystem,
@@ -33,12 +33,12 @@ pub struct Engine {
     device: wgpu::Device,
     queue: wgpu::Queue,
 
-    canvas_sys: CanvasSystem,
     camera_sys: CameraSystem,
     model_sys: ModelSystem,
-    depth_sys: DepthSystem,
     light_sys: LightSystem,
     skybox_sys: SkyboxSystem,
+
+    viewport: Viewport,
 
     camera_controller: CameraController,
 
@@ -77,14 +77,12 @@ impl Engine {
             })
             .await?;
 
-        let canvas_sys = CanvasSystem::new(surface, &adapter, &device, size);
-
         let texture_bind_group_layout = textures::make_regular_d2_texture_bind_group_layout(
             "[Engine::try_new] texture bind group layout",
             &device,
         );
 
-        let camera_sys = CameraSystem::new(&device, size);
+        let camera_sys = CameraSystem::new(&device);
         let camera_controller = CameraController::new(4.0, 0.4);
 
         let light_sys = LightSystem::new(&device);
@@ -102,13 +100,11 @@ impl Engine {
             )?
         };
 
-        let skybox_sys = SkyboxSystem::new(&device, sky_texture, &canvas_sys, &camera_sys);
-
-        let depth_sys = DepthSystem::new(&device, canvas_sys.surface_config());
+        let skybox_sys = SkyboxSystem::new(&device, sky_texture, &camera_sys);
 
         let mut model_sys = ModelSystem::new(
             &device,
-            canvas_sys.canvas_color_format(),
+            CANVAS_COLOR_FORMAT,
             &texture_bind_group_layout,
             &camera_sys,
             &light_sys,
@@ -153,18 +149,20 @@ impl Engine {
             Arc::new(simple_cube_mesh_for_light_source_indicator),
         ));
 
+        let viewport = Viewport::new(surface, &adapter, &device, size, &camera_sys);
+
         Ok(Self {
             ctx,
 
             device,
             queue,
 
-            canvas_sys,
             camera_sys,
             model_sys,
-            depth_sys,
             light_sys,
             skybox_sys,
+
+            viewport,
 
             camera_controller,
 
@@ -174,12 +172,8 @@ impl Engine {
 
     pub fn resize(&mut self, width: u32, height: u32) {
         if width > 0 && height > 0 {
-            self.canvas_sys.resize(&self.device, width, height);
-            self.camera_sys
-                .entry_mut()
-                .resize(&self.queue, width, height);
-
-            self.depth_sys.resize(&self.device, width, height);
+            self.viewport
+                .resize(&self.device, &self.queue, width, height);
         }
     }
 
@@ -188,12 +182,10 @@ impl Engine {
         let time_delta_ms = self.update_time_ms - last_update_time_ms;
         let time_delta_s = time_delta_ms as f32 / 1000.0;
 
-        self.camera_sys
-            .entry_mut()
-            .update_camera(&self.queue, |camera_data| {
-                self.camera_controller
-                    .update_camera(camera_data, time_delta_s);
-            });
+        self.viewport.update_camera(&self.queue, |camera_data| {
+            self.camera_controller
+                .update_camera(camera_data, time_delta_s);
+        });
 
         self.light_sys.update(&self.queue, time_delta_s);
 
@@ -204,63 +196,23 @@ impl Engine {
     pub fn render(&mut self) -> Result<(), wgpu::SurfaceError> {
         self.ctx.request_redraw();
 
-        if !self.canvas_sys.is_ready() {
+        if !self.viewport.is_ready() {
             return Ok(());
         }
 
-        let mut encoder = self
+        let encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("[Engine::render] render encoder"),
             });
 
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("[Engine::render] render pass"),
-                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                    view: self.canvas_sys.canvas_view(),
-                    depth_slice: None,
-                    resolve_target: None,
-                    ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
-                        }),
-                        store: wgpu::StoreOp::Store,
-                    },
-                })],
-                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                    view: &self.depth_sys.view(),
-                    depth_ops: Some(wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(1.0),
-                        store: wgpu::StoreOp::Store,
-                    }),
-                    stencil_ops: None,
-                }),
-                occlusion_query_set: None,
-                timestamp_writes: None,
-            });
+        self.viewport
+            .render(&self.queue, encoder, |render_pass, camera_entry| {
+                self.model_sys
+                    .draw(render_pass, camera_entry, &self.light_sys, &self.skybox_sys);
 
-            self.model_sys.draw(
-                &mut render_pass,
-                &self.camera_sys,
-                &self.light_sys,
-                &self.skybox_sys,
-            );
-
-            self.skybox_sys.draw(&mut render_pass, &self.camera_sys);
-        }
-
-        self.canvas_sys.try_do_render_pass_and_present(
-            &self.queue,
-            encoder,
-            #[allow(unused)]
-            |encoder, surface_view| {
-                // self.depth_sys.debug_draw(&surface_view, encoder);
-            },
-        )?;
+                self.skybox_sys.draw(render_pass, camera_entry);
+            })?;
 
         Ok(())
     }
@@ -306,5 +258,97 @@ impl SimpleApplicationEventHandler for Engine {
                 log::error!("Unable to render {}", e)
             }
         }
+    }
+}
+
+struct Viewport {
+    canvas_entry: CanvasEntry,
+    depth_entry: DepthEntry,
+    camera_entry: CameraEntry,
+}
+
+impl Viewport {
+    fn new(
+        surface: wgpu::Surface<'static>,
+        adapter: &wgpu::Adapter,
+        device: &wgpu::Device,
+        size: glam::UVec2,
+        camera_sys: &CameraSystem,
+    ) -> Self {
+        let canvas_entry = CanvasEntry::new(surface, &adapter, &device, size);
+        let depth_entry = DepthEntry::new(&device, canvas_entry.surface_config());
+        let camera_entry = camera_sys.make_entry(device, size);
+
+        Self {
+            canvas_entry,
+            depth_entry,
+            camera_entry,
+        }
+    }
+
+    fn resize(&mut self, device: &wgpu::Device, queue: &wgpu::Queue, width: u32, height: u32) {
+        if width > 0 && height > 0 {
+            self.canvas_entry.resize(device, width, height);
+            self.camera_entry.resize(queue, width, height);
+            self.depth_entry.resize(device, width, height);
+        }
+    }
+
+    fn update_camera(&mut self, queue: &wgpu::Queue, f: impl FnOnce(&mut CameraData)) {
+        self.camera_entry.update_camera(queue, f);
+    }
+
+    fn is_ready(&self) -> bool {
+        self.canvas_entry.is_ready()
+    }
+
+    fn render(
+        &self,
+        queue: &wgpu::Queue,
+        mut encoder: wgpu::CommandEncoder,
+        draw_fn: impl FnOnce(&mut wgpu::RenderPass, &CameraEntry) -> (),
+    ) -> Result<(), wgpu::SurfaceError> {
+        {
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("[Engine::render] render pass"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: self.canvas_entry.canvas_view(),
+                    depth_slice: None,
+                    resolve_target: None,
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.1,
+                            g: 0.2,
+                            b: 0.3,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_entry.view(),
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
+                occlusion_query_set: None,
+                timestamp_writes: None,
+            });
+
+            draw_fn(&mut render_pass, &self.camera_entry);
+        }
+
+        self.canvas_entry.try_do_render_pass_and_present(
+            queue,
+            encoder,
+            #[allow(unused)]
+            |encoder, surface_view| {
+                // self.depth_sys.debug_draw(&surface_view, encoder);
+            },
+        )?;
+
+        Ok(())
     }
 }

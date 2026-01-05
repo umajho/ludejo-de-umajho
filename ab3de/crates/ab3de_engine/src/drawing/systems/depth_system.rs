@@ -5,13 +5,13 @@ use crate::{
     textures,
 };
 
-pub struct DepthSystem {
+pub struct DepthEntry {
     texture: textures::DepthTextureNonComparisonSampler,
 
     debug_drawer: DebugDrawer,
 }
 
-impl DepthSystem {
+impl DepthEntry {
     pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
         let texture = Self::make_texture(device, (config.width, config.height).into());
 

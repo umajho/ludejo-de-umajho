@@ -1,6 +1,9 @@
 use crate::drawing::{
     shaders,
-    systems::{camera_system::CameraSystem, canvas_system::CanvasSystem},
+    systems::{
+        camera_system::{CameraEntry, CameraSystem},
+        canvas_system::CANVAS_COLOR_FORMAT,
+    },
     textures,
     utils::make_render_pipeline,
 };
@@ -15,7 +18,6 @@ impl SkyboxSystem {
     pub fn new(
         device: &wgpu::Device,
         sky_texture: textures::CubeTexture<textures::TextureFormatRgba32Float>,
-        canvas_sys: &CanvasSystem,
         camera_sys: &CameraSystem,
     ) -> Self {
         let environment_bind_group_layout =
@@ -69,7 +71,7 @@ impl SkyboxSystem {
                 "[SkyboxSystem::new] render pipeline for skybox",
                 &device,
                 &layout,
-                canvas_sys.canvas_color_format(),
+                CANVAS_COLOR_FORMAT,
                 Some(textures::DEPTH_FORMAT),
                 &[],
                 wgpu::PrimitiveTopology::TriangleList,
@@ -92,9 +94,9 @@ impl SkyboxSystem {
         &self.environment_bind_group
     }
 
-    pub fn draw(&self, render_pass: &mut wgpu::RenderPass<'_>, camera_sys: &CameraSystem) {
+    pub fn draw(&self, render_pass: &mut wgpu::RenderPass<'_>, camera_entry: &CameraEntry) {
         render_pass.set_pipeline(&self.sky_pipeline);
-        render_pass.set_bind_group(0, camera_sys.entry().bind_group(), &[]);
+        render_pass.set_bind_group(0, camera_entry.bind_group(), &[]);
         render_pass.set_bind_group(1, &self.environment_bind_group, &[]);
         render_pass.draw(0..3, 0..1);
     }
