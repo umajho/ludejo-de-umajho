@@ -21,38 +21,32 @@
   <body id="wasm-example">
     <canvas id="canvas" tabindex="-1"></canvas>
     <script type="module">
-      import init, { Runner } from "./dist-web-manual/ab3de_engine.js";
-
       window.addEventListener("DOMContentLoaded", async () => {
-        await init();
+        const worker = new Worker("./index.worker.js", {
+          type: "module",
+        });
+        const client = new WorkerClient(worker);
 
         /** @type {HTMLCanvasElement} */
         const canvas = document.getElementById("canvas");
         const offscreenCanvas = canvas.transferControlToOffscreen();
 
-        const runner = new Runner(offscreenCanvas);
+        await client.waitReady();
+        console.log("Worker is ready.");
 
-        Object.defineProperty(offscreenCanvas, "xRequestRedraw", {
-          value: () => {
-            requestAnimationFrame(() =>
-              runner.handle_redraw_requested()
-            );
-          },
-        });
+        await client.start(offscreenCanvas);
+        console.log("Started Runner.");
 
-        await runner.start();
-        console.log("WASM Loaded");
+        setUpResizeObserver(canvas, offscreenCanvas, client);
+        setUpEventListeners(canvas, client);
 
-        setUpResizeObserver(canvas, offscreenCanvas, runner);
-        setUpEventListeners(canvas, runner);
-
-        runner.handle_redraw_requested();
+        client.command("handle_redraw_requested");
       });
 
       function setUpResizeObserver(
         canvas,
         offscreenCanvas,
-        runner,
+        client,
       ) {
         const resizeObserver = new ResizeObserver((entries) => {
           for (const entry of entries) {
@@ -60,7 +54,8 @@
             const height = entry.contentRect.height;
             offscreenCanvas.width = width * devicePixelRatio;
             offscreenCanvas.height = height * devicePixelRatio;
-            runner.handle_resized(
+            client.command(
+              "handle_resized",
               offscreenCanvas.width,
               offscreenCanvas.height,
             );
@@ -69,30 +64,94 @@
         resizeObserver.observe(canvas);
       }
 
-      function setUpEventListeners(canvas, runner) {
+      function setUpEventListeners(canvas, client) {
         canvas.addEventListener("mousemove", (ev) => {
-          runner.handle_input_mouse_motion(ev.movementX, ev.movementY);
+          client.command(
+            "handle_input_mouse_motion",
+            ev.movementX,
+            ev.movementY,
+          );
         });
         canvas.addEventListener("keydown", (ev) => {
-          runner.handle_input_keyboard(ev.code, true);
+          client.command("handle_input_keyboard", ev.code, true);
         });
         canvas.addEventListener("keyup", (ev) => {
-          runner.handle_input_keyboard(ev.code, false);
+          client.command("handle_input_keyboard", ev.code, false);
         });
         canvas.addEventListener("wheel", (ev) => {
           ev.preventDefault();
-          runner.handle_input_mouse_wheel(
+          client.command(
+            "handle_input_mouse_wheel",
             ev.deltaX,
             ev.deltaY,
             ev.deltaMode,
           );
         });
         canvas.addEventListener("mousedown", (ev) => {
-          runner.handle_input_mouse_input(ev.button, true);
+          client.command("handle_input_mouse_input", ev.button, true);
         });
         canvas.addEventListener("mouseup", (ev) => {
-          runner.handle_input_mouse_input(ev.button, false);
+          client.command("handle_input_mouse_input", ev.button, false);
         });
+      }
+
+      class WorkerClient {
+        #worker;
+        constructor(worker) {
+          this.#worker = worker;
+        }
+
+        #hasCalledWaitReady = false;
+        #hasCalledStart = false;
+
+        waitReady() {
+          if (this.#hasCalledWaitReady) {
+            throw new Error("`waitReady` has already been called.");
+          }
+          this.#hasCalledWaitReady = true;
+          return new Promise((resolve) => {
+            const cb = (ev) => {
+              if (ev.data === "ready") {
+                resolve();
+                this.#worker.removeEventListener("message", cb);
+              }
+            };
+            this.#worker.addEventListener("message", cb);
+          });
+        }
+
+        start(offscreenCanvas) {
+          if (this.#hasCalledStart) {
+            throw new Error("`start` has already been called.");
+          }
+          this.#hasCalledStart = true;
+          this.#startFrameTicking();
+          return new Promise((resolve) => {
+            const cb = (ev) => {
+              if (ev.data === "started") {
+                resolve();
+                this.#worker.removeEventListener("message", cb);
+              }
+            };
+            this.#worker.addEventListener("message", cb);
+            this.#worker.postMessage(
+              ["start", offscreenCanvas],
+              [offscreenCanvas],
+            );
+          });
+        }
+
+        #startFrameTicking() {
+          const postTick = () => {
+            this.#worker.postMessage(["tick_frame"]);
+            requestAnimationFrame(postTick);
+          };
+          requestAnimationFrame(postTick);
+        }
+
+        command(name, ...args) {
+          this.#worker.postMessage(["command", name, ...args]);
+        }
       }
     </script>
   </body>
