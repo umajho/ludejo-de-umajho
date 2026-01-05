@@ -27,7 +27,7 @@ use crate::{
     utils,
 };
 
-pub struct App {
+pub struct Engine {
     ctx: Box<dyn ApplicationContext>,
 
     device: wgpu::Device,
@@ -45,7 +45,7 @@ pub struct App {
     update_time_ms: u64,
 }
 
-impl App {
+impl Engine {
     pub async fn try_new(
         surface_target: wgpu::SurfaceTarget<'static>,
         ctx: Box<dyn ApplicationContext>,
@@ -68,7 +68,7 @@ impl App {
 
         let (device, queue) = adapter
             .request_device(&wgpu::DeviceDescriptor {
-                label: Some("[App::try_new]"),
+                label: Some("[Engine::try_new]"),
                 required_features: wgpu::Features::empty(),
                 experimental_features: wgpu::ExperimentalFeatures::disabled(),
                 required_limits: wgpu::Limits::defaults(),
@@ -80,7 +80,7 @@ impl App {
         let canvas_sys = CanvasSystem::new(surface, &adapter, &device, size);
 
         let texture_bind_group_layout = textures::make_regular_d2_texture_bind_group_layout(
-            "[App::try_new] texture bind group layout",
+            "[Engine::try_new] texture bind group layout",
             &device,
         );
 
@@ -211,12 +211,12 @@ impl App {
         let mut encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("[App::render] render encoder"),
+                label: Some("[Engine::render] render encoder"),
             });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                label: Some("[App::render] render pass"),
+                label: Some("[Engine::render] render pass"),
                 color_attachments: &[Some(wgpu::RenderPassColorAttachment {
                     view: self.canvas_sys.canvas_view(),
                     depth_slice: None,
@@ -266,7 +266,7 @@ impl App {
     }
 }
 
-impl SimpleApplicationEventHandler for App {
+impl SimpleApplicationEventHandler for Engine {
     fn handle_input(&mut self, input: Input) -> bool {
         match input {
             Input::MouseMotion { delta } => {

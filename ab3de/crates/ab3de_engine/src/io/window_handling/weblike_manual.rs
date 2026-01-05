@@ -7,7 +7,7 @@ use web_sys::{
 };
 
 use crate::{
-    app::App,
+    engine::Engine,
     io::window_handling::{
         ApplicationContext, ElementState, Input, KeyCode, MouseScrollDelta, PhysicalKey,
         SimpleApplicationEventHandler,
@@ -15,7 +15,7 @@ use crate::{
 };
 
 pub struct WeblikeManualWindowHandler {
-    app: App,
+    engine: Engine,
 }
 
 impl WeblikeManualWindowHandler {
@@ -25,20 +25,22 @@ impl WeblikeManualWindowHandler {
         let size = glam::uvec2(canvas.width(), canvas.height());
 
         Self {
-            app: App::try_new(surface_target, ctx, size).await.unwrap_throw(),
+            engine: Engine::try_new(surface_target, ctx, size)
+                .await
+                .unwrap_throw(),
         }
     }
 
     pub fn handle_resized(&mut self, width: u32, height: u32) {
-        self.app.handle_resized((width, height));
+        self.engine.handle_resized((width, height));
     }
 
     pub fn handle_redraw_requested(&mut self) {
-        self.app.handle_redraw_requested();
+        self.engine.handle_redraw_requested();
     }
 
     pub fn handle_input_mouse_motion(&mut self, delta_x: f64, delta_y: f64) {
-        _ = self.app.handle_input(Input::MouseMotion {
+        _ = self.engine.handle_input(Input::MouseMotion {
             delta: (delta_x, delta_y),
         });
     }
@@ -64,7 +66,7 @@ impl WeblikeManualWindowHandler {
             ElementState::Released
         };
 
-        _ = self.app.handle_input(Input::KeyboardInput {
+        _ = self.engine.handle_input(Input::KeyboardInput {
             physical_key,
             state,
         });
@@ -82,7 +84,7 @@ impl WeblikeManualWindowHandler {
             _ => return,
         };
 
-        _ = self.app.handle_input(Input::MouseWheel { delta });
+        _ = self.engine.handle_input(Input::MouseWheel { delta });
     }
 
     pub fn handle_input_mouse_input(&mut self, button: u8, is_down: bool) {
@@ -97,7 +99,9 @@ impl WeblikeManualWindowHandler {
             ElementState::Released
         };
 
-        _ = self.app.handle_input(Input::MouseInput { button, state });
+        _ = self
+            .engine
+            .handle_input(Input::MouseInput { button, state });
     }
 }
 

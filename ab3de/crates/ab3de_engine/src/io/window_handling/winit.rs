@@ -8,7 +8,7 @@ use winit::{
 };
 
 use crate::{
-    app::App,
+    engine::Engine,
     io::window_handling::{
         ApplicationContext, ElementState, Input, KeyCode, MouseButton, MouseScrollDelta,
         PhysicalKey, SimpleApplicationEventHandler,
@@ -22,7 +22,7 @@ pub struct WinitWindowHandler {
 
 enum State {
     Uninitialized,
-    Ready(App),
+    Ready(Engine),
 }
 
 impl WinitWindowHandler {
@@ -51,9 +51,9 @@ impl ApplicationHandler for WinitWindowHandler {
             window: window.clone(),
         });
 
-        let inner_handler_future = App::try_new(window.into(), ctx, size);
-        let inner_handler = pollster::block_on(inner_handler_future).unwrap();
-        self.state = State::Ready(inner_handler);
+        let engine_future = Engine::try_new(window.into(), ctx, size);
+        let engine = pollster::block_on(engine_future).unwrap();
+        self.state = State::Ready(engine);
     }
 
     fn device_event(
@@ -62,15 +62,13 @@ impl ApplicationHandler for WinitWindowHandler {
         _device_id: DeviceId,
         event: DeviceEvent,
     ) {
-        let inner_handler = match &mut self.state {
-            State::Ready(inner_handler) => inner_handler,
+        let engine = match &mut self.state {
+            State::Ready(engine) => engine,
             _ => return,
         };
 
         let _has_consumed = match event {
-            DeviceEvent::MouseMotion { delta } => {
-                inner_handler.handle_input(Input::MouseMotion { delta })
-            }
+            DeviceEvent::MouseMotion { delta } => engine.handle_input(Input::MouseMotion { delta }),
             _ => false,
         };
     }
@@ -81,8 +79,8 @@ impl ApplicationHandler for WinitWindowHandler {
         window_id: WindowId,
         event: WindowEvent,
     ) {
-        let inner_handler = match &mut self.state {
-            State::Ready(inner_handler) => inner_handler,
+        let engine = match &mut self.state {
+            State::Ready(engine) => engine,
             _ => return,
         };
 
@@ -95,19 +93,15 @@ impl ApplicationHandler for WinitWindowHandler {
         }
 
         let has_consumed = match &event {
-            WindowEvent::KeyboardInput { event, .. } => {
-                inner_handler.handle_input(Input::KeyboardInput {
-                    physical_key: event.physical_key.into(),
-                    state: event.state.into(),
-                })
-            }
-            WindowEvent::MouseWheel { delta, .. } => {
-                inner_handler.handle_input(Input::MouseWheel {
-                    delta: (*delta).into(),
-                })
-            }
+            WindowEvent::KeyboardInput { event, .. } => engine.handle_input(Input::KeyboardInput {
+                physical_key: event.physical_key.into(),
+                state: event.state.into(),
+            }),
+            WindowEvent::MouseWheel { delta, .. } => engine.handle_input(Input::MouseWheel {
+                delta: (*delta).into(),
+            }),
             WindowEvent::MouseInput { button, state, .. } => {
-                inner_handler.handle_input(Input::MouseInput {
+                engine.handle_input(Input::MouseInput {
                     button: (*button).into(),
                     state: (*state).into(),
                 })
@@ -133,10 +127,10 @@ impl ApplicationHandler for WinitWindowHandler {
                 event_loop.exit();
             }
             WindowEvent::Resized(size) => {
-                inner_handler.handle_resized((size.width, size.height));
+                engine.handle_resized((size.width, size.height));
             }
             WindowEvent::RedrawRequested => {
-                inner_handler.handle_redraw_requested();
+                engine.handle_redraw_requested();
             }
             _ => {}
         }
