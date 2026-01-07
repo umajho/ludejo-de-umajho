@@ -2,9 +2,7 @@ import Path from "node:path";
 
 import * as Canvas2d from "./canvas-2d.ts";
 
-const shader = await Deno.readTextFile(
-  Path.join(import.meta.dirname!, "./canvas-2d-renderer.wgsl"),
-);
+const shader = await Deno.readTextFile(Path.join(import.meta.dirname!, "./copying.wgsl"));
 
 /**
  * @author ChatGPT
@@ -37,11 +35,11 @@ export class Canvas2dRenderer {
       layout: "auto",
       vertex: {
         module: shaderModule,
-        entryPoint: "vs",
+        entryPoint: "vs_main",
       },
       fragment: {
         module: shaderModule,
-        entryPoint: "fs",
+        entryPoint: "fs_main",
         targets: [{ format }],
       },
       primitive: {
@@ -80,8 +78,8 @@ export class Canvas2dRenderer {
     const bindGroup = this.#device.createBindGroup({
       layout: this.#pipeline.getBindGroupLayout(0),
       entries: [
-        { binding: 0, resource: this.#sampler },
-        { binding: 1, resource: texture.createView() },
+        { binding: 0, resource: texture.createView() },
+        { binding: 1, resource: this.#sampler },
       ],
     });
 
@@ -92,15 +90,15 @@ export class Canvas2dRenderer {
     return this.#dynamic?.texture ?? null;
   }
 
-  render(context: GPUCanvasContext, canvas2d: Canvas2d.Canvas) {
-    const width = canvas2d.width;
-    const height = canvas2d.height;
+  render(context: GPUCanvasContext, src: Canvas2d.Canvas) {
+    const width = src.width;
+    const height = src.height;
 
     const { texture, bindGroup } = this.#updateDynamic({ width, height });
 
     this.#device.queue.writeTexture(
       { texture },
-      canvas2d.getContext("2d").getImageData(0, 0, width, height).data,
+      src.getContext("2d").getImageData(0, 0, width, height).data,
       { bytesPerRow: width * 4 },
       { width, height },
     );
