@@ -50,11 +50,7 @@ impl CameraEntry {
         size: glam::UVec2,
         bind_group_layout: &wgpu::BindGroupLayout,
     ) -> Self {
-        let camera = Camera::new(CameraData {
-            position: (0.0, 5.0, 10.0).into(),
-            yaw_radians: -90.0_f32.to_radians(),
-            pitch_radians: -20.0_f32.to_radians(),
-        });
+        let camera = Camera::new(CameraData::default());
         let projection = Projection::new(size, 45.0_f32.to_radians(), 0.1, 100.0);
 
         let mut uniform = CameraUniform::new();
@@ -159,11 +155,21 @@ impl Camera {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CameraData {
     pub position: glam::Vec3,
     pub yaw_radians: f32,
     pub pitch_radians: f32,
+}
+
+impl CameraData {
+    pub fn default() -> Self {
+        Self {
+            position: (0.0, 5.0, 10.0).into(),
+            yaw_radians: -90.0_f32.to_radians(),
+            pitch_radians: -20.0_f32.to_radians(),
+        }
+    }
 }
 
 struct Projection {

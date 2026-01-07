@@ -70,7 +70,7 @@ impl WeblikeManualWindowHandler {
             queue,
             engine,
             viewport,
-            camera_controller: CameraController::new(4.0, 0.4),
+            camera_controller: CameraController::default(),
             update_time_ms: utils::now_ms(),
         }
     }

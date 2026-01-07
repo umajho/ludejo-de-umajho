@@ -1,13 +1,12 @@
 use std::f32::consts::FRAC_PI_2;
 
-use crate::{
-    drawing::systems::camera_system::CameraData,
-    io::window_handling::{ElementState, KeyCode, MouseButton, MouseScrollDelta, PhysicalKey},
-};
+use ab3de_engine::CameraData;
+
+use crate::inputting::{ElementState, KeyCode, MouseButton, MouseScrollDelta, PhysicalKey};
 
 const SAFE_FRAC_PI_2: f32 = FRAC_PI_2 - 0.0001;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct CameraController {
     amount_left: f32,
     amount_right: f32,
@@ -40,6 +39,10 @@ impl CameraController {
             sensitivity,
             mouse_pressed: false,
         }
+    }
+
+    pub fn default() -> Self {
+        Self::new(4.0, 0.4)
     }
 
     pub fn process_keyboard(&mut self, key: KeyCode, state: ElementState) -> bool {

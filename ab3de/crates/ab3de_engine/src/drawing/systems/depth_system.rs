@@ -1,7 +1,7 @@
 use wgpu::util::DeviceExt;
 
 use crate::{
-    drawing::{models::ShapeVertex, shaders},
+    drawing::{models::ShapeVertex, shaders, systems::canvas_system::CanvasEntryConfiguration},
     textures,
 };
 
@@ -12,8 +12,8 @@ pub struct DepthEntry {
 }
 
 impl DepthEntry {
-    pub fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
-        let texture = Self::make_texture(device, (config.width, config.height).into());
+    pub fn new(device: &wgpu::Device, config: &CanvasEntryConfiguration) -> Self {
+        let texture = Self::make_texture(device, config.size);
 
         let debug_drawer = DebugDrawer::new(device, config, &texture);
 
@@ -80,7 +80,7 @@ struct DebugDrawer {
 impl DebugDrawer {
     fn new(
         device: &wgpu::Device,
-        config: &wgpu::SurfaceConfiguration,
+        config: &CanvasEntryConfiguration,
         texture: &textures::DepthTextureNonComparisonSampler,
     ) -> Self {
         let shader = shaders::r_depth_debug(&device);
@@ -135,7 +135,7 @@ impl DebugDrawer {
             }),
             fragment: shader.fragment_state(shaders::FragmentStatePartial {
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: config.format.add_srgb_suffix(),
+                    format: config.color_format.add_srgb_suffix(),
                     blend: Some(wgpu::BlendState {
                         color: wgpu::BlendComponent::REPLACE,
                         alpha: wgpu::BlendComponent::REPLACE,

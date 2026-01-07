@@ -1,0 +1,29 @@
+[package]
+name = "ab3de"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+ab3de_engine = { workspace = true }
+ab3de_internal_shared = { workspace = true }
+ab3de_ui = { workspace = true }
+
+anyhow = { workspace = true }
+clap = { version = "4.5.54", features = ["derive"] }
+eframe = { version = "0.33.3", default-features = false, features = [
+  "wgpu",
+  "accesskit",
+  "default_fonts",
+  "wayland",
+  "x11",
+] }
+env_logger = "0.11.8"
+glam = { workspace = true }
+log = { workspace = true }
+pollster = "0.4.0"
+snafu = "0.8.9"
+# This is to enable the feature `metal` in the crate `wgpu` used by the crate
+# `egui-wgpu`. The latter is a dependency of `eframe` when the feature `wgpu`
+# is enabled. This dependency's version must match the one used by `egui-wgpu`.
+wgpu = { workspace = true, features = ["metal"] }
+winit = { version = "0.30.12", features = ["android-native-activity"] }

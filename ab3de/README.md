@@ -2,6 +2,18 @@
 
 A toy 3D toolkit I'm building to learn about various topics.
 
+## TODOs
+
+- [ ] FIXME: camera movement jittering.
+  - see: <https://github.com/sotrh/learn-wgpu/issues/294>.
+  - This has been mitigated on the `wasm-weblike-manual` build since the render
+    process is moved to a web worker, although I think there is still some room
+    for improvement.
+  - For the native app, rendering has also been moved to a separate thread, but
+    I don't see much improvement.
+- [ ] FIXME: on Zen (Firefox 146), resizing usually freezes the whole browser
+      for a while. When the browser recovers, the rendering stops working.
+
 ## Current Goals
 
 - [ ] Add egui intergration to learn egui.
@@ -22,6 +34,14 @@ A toy 3D toolkit I'm building to learn about various topics.
   - [ ] Add UI to inspect `.pmx` file contents.
   - [ ] Support physics. (`rapier3d` or `wgrapier3d`? Should be deterministic.)
 - [ ] remotion/FrameScript integration.
+
+## Coding conventions
+
+Function parameter ordering:
+
+- label and name
+- context parameters (e.g., device, queue)
+- other parameters
 
 ## Credits
 

@@ -1,7 +1,6 @@
 #![feature(cfg_select)]
 #![feature(decl_macro)]
 
-mod camera_controller;
 mod drawing;
 mod embedded_demo_resources;
 mod engine;
@@ -9,28 +8,15 @@ mod io;
 mod model_loaders;
 mod utils;
 
+pub use drawing::systems::camera_system::CameraData;
+pub use engine::{Engine, Viewport, ViewportConfiguration};
+
 #[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
 
+use crate::drawing::textures;
 #[cfg(all(target_arch = "wasm32", feature = "wasm-weblike-manual"))]
 use crate::io::window_handling::weblike_manual::WeblikeManualWindowHandler;
-use crate::{drawing::textures, io::window_handling::winit::WinitWindowHandler};
-
-pub fn run_winit() -> anyhow::Result<()> {
-    let event_loop = winit::event_loop::EventLoop::with_user_event().build()?;
-
-    let mut handler = WinitWindowHandler::new();
-
-    event_loop.run_app(&mut handler)?;
-
-    Ok(())
-}
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn run_native_winit() -> anyhow::Result<()> {
-    env_logger::init();
-    run_winit()
-}
 
 #[cfg(all(target_arch = "wasm32", feature = "wasm-weblike-manual"))]
 static HAS_INITIALIZED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);

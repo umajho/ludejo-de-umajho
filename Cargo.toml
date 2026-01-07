@@ -1,3 +1,15 @@
 [workspace]
 resolver = "3"
 members = ["ui/deno-wasm-wgpu/crates/*", "ab3de/crates/*"]
+
+[workspace.dependencies]
+ab3de_engine = { path = "ab3de/crates/ab3de_engine" }
+ab3de_internal_shared = { path = "ab3de/crates/ab3de_internal_shared" }
+ab3de_ui = { path = "ab3de/crates/ab3de_ui" }
+
+# see `ab3de`'s `Cargo.toml` for the reason why we choose this version.
+wgpu = "27"
+
+anyhow = "1.0.100"
+glam = "0.30.9"
+log = "0.4.29"

@@ -3,59 +3,28 @@ use crate::drawing::{shaders, textures, utils::make_render_pipeline};
 pub const CANVAS_COLOR_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba16Float;
 
 pub struct CanvasEntry {
-    surface: wgpu::Surface<'static>,
-    surface_config: wgpu::SurfaceConfiguration,
-
+    config: CanvasEntryConfiguration,
     canvas: HdrToneMappingCanvas,
 }
 
+pub struct CanvasEntryConfiguration {
+    pub size: glam::UVec2,
+    pub color_format: wgpu::TextureFormat,
+}
+
 impl CanvasEntry {
-    pub fn new(
-        surface: wgpu::Surface<'static>,
-        adapter: &wgpu::Adapter,
-        device: &wgpu::Device,
-        size: glam::UVec2,
-    ) -> Self {
-        let surface_caps = surface.get_capabilities(adapter);
-        let surface_format = surface_caps
-            .formats
-            .iter()
-            .find(|f| f.is_srgb())
-            .copied()
-            .unwrap_or(surface_caps.formats[0]);
-        let config = wgpu::SurfaceConfiguration {
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-            format: surface_format,
-            width: size.x,
-            height: size.y,
-            present_mode: surface_caps.present_modes[0],
-            // present_mode: wgpu::PresentMode::AutoNoVsync,
-            alpha_mode: surface_caps.alpha_modes[0],
-            view_formats: vec![surface_format.add_srgb_suffix()],
-            desired_maximum_frame_latency: 2,
-        };
-
-        surface.configure(device, &config);
-
+    pub fn new(device: &wgpu::Device, config: CanvasEntryConfiguration) -> Self {
         let canvas = HdrToneMappingCanvas::new(device, &config);
 
-        Self {
-            surface,
-            surface_config: config,
-            canvas,
-        }
+        Self { config, canvas }
     }
 
     pub fn resize(&mut self, device: &wgpu::Device, width: u32, height: u32) {
-        self.surface_config.width = width;
-        self.surface_config.height = height;
-        self.surface.configure(device, &self.surface_config);
-
         self.canvas.resize(device, width, height);
     }
 
-    pub fn surface_config(&self) -> &wgpu::SurfaceConfiguration {
-        &self.surface_config
+    pub fn config(&self) -> &CanvasEntryConfiguration {
+        &self.config
     }
 
     pub fn canvas_view(&self) -> &wgpu::TextureView {
@@ -66,21 +35,14 @@ impl CanvasEntry {
         &self,
         queue: &wgpu::Queue,
         mut encoder: wgpu::CommandEncoder,
-        additional: impl FnOnce(&mut wgpu::CommandEncoder, wgpu::TextureView) -> (),
-    ) -> Result<(), wgpu::SurfaceError> {
-        let output = self.surface.get_current_texture()?;
-        let output_view = output.texture.create_view(&wgpu::TextureViewDescriptor {
-            format: Some(self.surface_config.format.add_srgb_suffix()),
-            ..Default::default()
-        });
+        output_view: &wgpu::TextureView,
+        additional: impl FnOnce(&mut wgpu::CommandEncoder, &wgpu::TextureView) -> (),
+    ) {
         self.canvas.do_render_pass(&mut encoder, &output_view);
 
         additional(&mut encoder, output_view);
 
         queue.submit(std::iter::once(encoder.finish()));
-        output.present();
-
-        Ok(())
     }
 }
 
@@ -92,7 +54,7 @@ struct HdrToneMappingCanvas {
 }
 
 impl HdrToneMappingCanvas {
-    fn new(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
+    fn new(device: &wgpu::Device, config: &CanvasEntryConfiguration) -> Self {
         let layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
             label: Some("[HdrToneMappingCanvas::new] bind group layout"),
             entries: &[
@@ -118,7 +80,7 @@ impl HdrToneMappingCanvas {
         let (texture, bind_group) = Self::make_texture_and_bind_group(
             device,
             &layout,
-            glam::UVec2::new(config.width.max(1), config.height.max(1)),
+            glam::UVec2::new(config.size.x.max(1), config.size.y.max(1)),
         );
 
         debug_assert_eq!(texture.texture().format(), CANVAS_COLOR_FORMAT);
@@ -133,7 +95,7 @@ impl HdrToneMappingCanvas {
             "[HdrToneMappingCanvas::new] render pipeline",
             device,
             &pipeline_layout,
-            config.format,
+            config.color_format,
             None,
             &[],
             wgpu::PrimitiveTopology::TriangleList,

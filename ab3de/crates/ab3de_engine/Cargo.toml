@@ -14,25 +14,22 @@ wasm-weblike-manual = []
 default = ["native-winit", "wasm-weblike-manual"]
 
 [dependencies]
-anyhow = "1.0.100"
+anyhow = { workspace = true }
 bytemuck = { version = "1.24.0", features = ["derive"] }
-env_logger = "0.11.8"
-glam = { version = "0.30.9", features = ["bytemuck"] }
+glam = { workspace = true, features = ["bytemuck"] }
 image = { version = "0.24.9", default-features = false, features = [
   "png",
   "jpeg",
   "hdr",
 ] }
-log = "0.4.29"
+log = { workspace = true }
 # disabled vek because: https://github.com/yoanlcq/vek/issues/96
 mmd = { version = "0.0.6", default-features = false, features = ["arrayvec"] }
-pollster = "0.4.0"
 rust-embed = "8.9.0"
 tobj = { version = "4.0.3", default-features = false, features = ["async"] }
 trig-const = "0.3.0"
 wesl = "0.3.2"
-wgpu = "27.0.1"
-winit = { version = "0.30.12", features = ["android-native-activity"] }
+wgpu = { workspace = true }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 console_error_panic_hook = "0.1.7"

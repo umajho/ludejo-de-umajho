@@ -4,7 +4,7 @@ use crate::{
     drawing::{
         systems::{
             camera_system::{CameraData, CameraEntry, CameraSystem},
-            canvas_system::{CANVAS_COLOR_FORMAT, CanvasEntry},
+            canvas_system::{CANVAS_COLOR_FORMAT, CanvasEntry, CanvasEntryConfiguration},
             depth_system::DepthEntry,
             light_system::LightSystem,
             model_system::{
@@ -116,13 +116,8 @@ impl Engine {
         })
     }
 
-    pub fn make_viewport(
-        &self,
-        surface: wgpu::Surface<'static>,
-        adapter: &wgpu::Adapter,
-        size: glam::UVec2,
-    ) -> Viewport {
-        Viewport::new(surface, adapter, &self.device, size, &self.camera_sys)
+    pub fn make_viewport(&self, config: ViewportConfiguration) -> Viewport {
+        Viewport::new(&self.device, &self.camera_sys, config)
     }
 
     pub fn update(&mut self, now_ms: u64, dt_s: f32) {
@@ -130,21 +125,24 @@ impl Engine {
         self.model_sys.update(&self.device, &self.queue, now_ms);
     }
 
-    pub fn render(&mut self, viewport: &Viewport) -> Result<(), wgpu::SurfaceError> {
+    pub fn render(&mut self, viewport: &Viewport, output_view: &wgpu::TextureView) {
         let encoder = self
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("[Engine::render] render encoder"),
             });
 
-        viewport.render(&self.queue, encoder, |render_pass, camera_entry| {
-            self.model_sys
-                .draw(render_pass, camera_entry, &self.light_sys, &self.skybox_sys);
+        viewport.render(
+            &self.queue,
+            encoder,
+            output_view,
+            |render_pass, camera_entry| {
+                self.model_sys
+                    .draw(render_pass, camera_entry, &self.light_sys, &self.skybox_sys);
 
-            self.skybox_sys.draw(render_pass, camera_entry);
-        })?;
-
-        Ok(())
+                self.skybox_sys.draw(render_pass, camera_entry);
+            },
+        );
     }
 }
 
@@ -154,17 +152,26 @@ pub struct Viewport {
     camera_entry: CameraEntry,
 }
 
+pub struct ViewportConfiguration {
+    pub size: glam::UVec2,
+    pub color_format: wgpu::TextureFormat,
+}
+
 impl Viewport {
     fn new(
-        surface: wgpu::Surface<'static>,
-        adapter: &wgpu::Adapter,
         device: &wgpu::Device,
-        size: glam::UVec2,
         camera_sys: &CameraSystem,
+        config: ViewportConfiguration,
     ) -> Self {
-        let canvas_entry = CanvasEntry::new(surface, &adapter, &device, size);
-        let depth_entry = DepthEntry::new(&device, canvas_entry.surface_config());
-        let camera_entry = camera_sys.make_entry(device, size);
+        let canvas_entry = CanvasEntry::new(
+            &device,
+            CanvasEntryConfiguration {
+                size: config.size,
+                color_format: config.color_format,
+            },
+        );
+        let depth_entry = DepthEntry::new(&device, canvas_entry.config());
+        let camera_entry = camera_sys.make_entry(device, config.size);
 
         Self {
             canvas_entry,
@@ -189,8 +196,9 @@ impl Viewport {
         &self,
         queue: &wgpu::Queue,
         mut encoder: wgpu::CommandEncoder,
+        output_view: &wgpu::TextureView,
         draw_fn: impl FnOnce(&mut wgpu::RenderPass, &CameraEntry) -> (),
-    ) -> Result<(), wgpu::SurfaceError> {
+    ) {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 label: Some("[Viewport::render] render pass"),
@@ -226,12 +234,11 @@ impl Viewport {
         self.canvas_entry.try_do_render_pass_and_present(
             queue,
             encoder,
+            output_view,
             #[allow(unused)]
-            |encoder, surface_view| {
-                // self.depth_sys.debug_draw(&surface_view, encoder);
+            |encoder, output_view| {
+                // self.depth_sys.debug_draw(output_view, encoder);
             },
-        )?;
-
-        Ok(())
+        );
     }
 }
