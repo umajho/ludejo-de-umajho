@@ -1,12 +1,12 @@
 [package]
 name = "eframe"
-version.workspace = true
+version = "0.33.3" # TODO(umaĵo): revert back.
 authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
 description = "egui framework - write GUI apps that compiles to web and/or natively"
 edition.workspace = true
 rust-version.workspace = true
 homepage = "https://github.com/emilk/egui/tree/main/crates/eframe"
-license.workspace = true
+license = "MIT OR Apache-2.0" # TODO: revert back.
 readme = "README.md"
 repository = "https://github.com/emilk/egui/tree/main/crates/eframe"
 categories = ["gui", "game-development"]
@@ -19,7 +19,7 @@ targets = ["x86_64-unknown-linux-gnu", "wasm32-unknown-unknown"]
 rustdoc-args = ["--generate-link-to-definition"]
 
 [lints]
-workspace = true
+# workspace = true # TODO(umaĵo): revert back.
 
 [lib]
 
@@ -113,7 +113,7 @@ egui = { workspace = true, default-features = false, features = ["bytemuck"] }
 
 ahash.workspace = true
 document-features.workspace = true
-log.workspace = true
+log = { version = "0.4.28", features = ["std"] } # TODO(umaĵo): revert back.
 parking_lot.workspace = true
 profiling.workspace = true
 raw-window-handle.workspace = true
@@ -146,7 +146,7 @@ glutin-winit = { workspace = true, optional = true, default-features = false, fe
   "wgl",
 ] }
 home = { workspace = true, optional = true }
-wgpu = { workspace = true, optional = true }
+wgpu = { version = "27.0.1", default-features = false, features = ["std"], optional = true } # TODO(umaĵo): revert back.
 
 # mac:
 [target.'cfg(any(target_os = "macos"))'.dependencies]

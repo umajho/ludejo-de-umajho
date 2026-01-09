@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
-members = ["ui/deno-wasm-wgpu/crates/*", "ab3de/crates/*"]
+members = [
+  "ui/deno-wasm-wgpu/crates/*",
+  "ab3de/crates/*",
+  "ui/egui-web-decoupling-websys/crates/*",
+]
 
 [workspace.package]
 edition = "2024"
@@ -17,3 +21,63 @@ wgpu = "27"
 anyhow = "1.0.100"
 glam = "0.30.9"
 log = "0.4.29"
+
+# dependencies used by `eframe` and `egui_demo_app`
+# =================================================
+
+# in repo `egui`
+# --------------
+eframe = { version = "0.33.3", path = "ui/egui-web-decoupling-websys/crates/eframe", default-features = false }
+
+egui = { version = "0.33.3", default-features = false }
+egui_demo_lib = { version = "0.33.3", default-features = false }
+egui_extras = { version = "0.33.3", default-features = false }
+egui_glow = { version = "0.33.3", default-features = false }
+egui_kittest = { version = "0.33.3", default-features = false }
+egui-wgpu = { version = "0.33.3", default-features = false }
+egui-winit = { version = "0.33.3", default-features = false }
+
+# others
+# ------
+accesskit = "0.21.1"
+accesskit_consumer = "0.30.1"
+ahash = { version = "0.8.12", default-features = false, features = [
+  "no-rng", # we don't need DOS-protection, so we let users opt-in to it instead
+  "std",
+] }
+bytemuck = "1.24.0"
+chrono = { version = "0.4.42", default-features = false }
+directories = "6.0.0"
+document-features = "0.2.11"
+ehttp = { version = "0.6.0", default-features = false }
+env_logger = { version = "0.11.8", default-features = false }
+glow = "0.16.0"
+glutin = { version = "0.32.3", default-features = false }
+glutin-winit = { version = "0.5.0", default-features = false }
+home = "0.5.9"
+image = { version = "0.25.6", default-features = false }
+js-sys = "0.3.77"
+# log (already added)
+mimalloc = "0.1.48"
+objc2 = "0.5.2"
+objc2-app-kit = { version = "0.2.2", default-features = false }
+objc2-foundation = { version = "0.2.2", default-features = false }
+parking_lot = "0.12.5"
+percent-encoding = "2.3.2"
+pollster = "0.4.0"
+poll-promise = { version = "0.3.0", default-features = false }
+profiling = { version = "1.0.17", default-features = false }
+puffin = "0.19.1"
+puffin_http = "0.16.1"
+raw-window-handle = "0.6.2"
+rfd = "0.15.4"
+ron = "0.11.0"
+serde = { version = "1.0.228", features = ["derive"] }
+static_assertions = "1.1.0"
+wasm-bindgen = "0.2.100" # Keep wasm-bindgen version in sync in: setup_web.sh, Cargo.toml, Cargo.lock, rust.yml
+wasm-bindgen-futures = "0.4.0"
+web-sys = "0.3.77"
+web-time = "1.1.0"             # Timekeeping for native and web
+# wgpu (already added)
+windows-sys = "0.61.2"
+winit = { version = "0.30.12", default-features = false }

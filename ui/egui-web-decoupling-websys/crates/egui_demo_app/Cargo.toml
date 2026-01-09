@@ -1,8 +1,8 @@
 [package]
 name = "egui_demo_app"
-version.workspace = true
+version = "0.33.3" # TODO(umaĵo): revert back.
 authors = ["Emil Ernerfeldt <emil.ernerfeldt@gmail.com>"]
-license.workspace = true
+license = "MIT OR Apache-2.0" # TODO: revert back.
 edition.workspace = true
 rust-version.workspace = true
 publish = false
@@ -12,7 +12,7 @@ default-run = "egui_demo_app"
 ignored = ["profiling"]
 
 [lints]
-workspace = true
+# workspace = true # TODO(umaĵo): revert back.
 
 [package.metadata.docs.rs]
 all-features = true
@@ -51,7 +51,7 @@ image = { workspace = true, default-features = false, features = [
   # Ensure we can display the test images
   "png",
 ] }
-log.workspace = true
+log = { version = "0.4.28", features = ["std"] } # TODO(umaĵo): revert back.
 profiling.workspace = true
 
 # Optional dependencies:
@@ -62,7 +62,7 @@ puffin = { workspace = true, optional = true }
 puffin_http = { workspace = true, optional = true }
 # Enable both WebGL & WebGPU when targeting the web (these features have no effect when not targeting wasm32)
 # Also enable the default features so we have a supported backend for every platform.
-wgpu = { workspace = true, features = ["default", "webgpu", "webgl"], optional = true }
+wgpu = { version = "27.0.1", default-features = false, features = ["std", "default", "webgpu", "webgl"], optional = true } # TODO(umaĵo): revert back.
 
 
 # feature "http":
