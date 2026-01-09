@@ -2,6 +2,10 @@
 resolver = "3"
 members = ["ui/deno-wasm-wgpu/crates/*", "ab3de/crates/*"]
 
+[workspace.package]
+edition = "2024"
+rust-version = "1.94"
+
 [workspace.dependencies]
 ab3de_engine = { path = "ab3de/crates/ab3de_engine" }
 ab3de_internal_shared = { path = "ab3de/crates/ab3de_internal_shared" }
