@@ -10,6 +10,9 @@ members = [
 edition = "2024"
 rust-version = "1.94"
 
+[patch.crates-io]
+eframe = { path = "ui/egui-web-decoupling-websys/crates/eframe" }
+
 [workspace.dependencies]
 ab3de_engine = { path = "ab3de/crates/ab3de_engine" }
 ab3de_internal_shared = { path = "ab3de/crates/ab3de_internal_shared" }

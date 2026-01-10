@@ -11,7 +11,7 @@ dependencies = [
  "ab3de_ui",
  "anyhow",
  "clap",
- "eframe 0.33.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "eframe",
  "env_logger",
  "glam",
  "log",
@@ -1346,42 +1346,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "eframe"
-version = "0.33.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "457481173e6db5ca9fa2be93a58df8f4c7be639587aeb4853b526c6cf87db4e6"
-dependencies = [
- "ahash",
- "bytemuck",
- "document-features",
- "egui",
- "egui-wgpu",
- "egui-winit",
- "egui_glow",
- "glutin",
- "glutin-winit",
- "image 0.25.9",
- "js-sys",
- "log",
- "objc2 0.5.2",
- "objc2-app-kit 0.2.2",
- "objc2-foundation 0.2.2",
- "parking_lot",
- "percent-encoding",
- "pollster",
- "profiling",
- "raw-window-handle",
- "static_assertions",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
- "web-time",
- "wgpu",
- "windows-sys 0.61.2",
- "winit",
-]
-
-[[package]]
 name = "egui"
 version = "0.33.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1453,7 +1417,7 @@ dependencies = [
  "accesskit_consumer 0.30.1",
  "bytemuck",
  "chrono",
- "eframe 0.33.3",
+ "eframe",
  "egui",
  "egui_demo_lib",
  "egui_extras",
@@ -1532,7 +1496,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43afb5f968dfa9e6c8f5e609ab9039e11a2c4af79a326f4cb1b99cf6875cb6a0"
 dependencies = [
  "dify",
- "eframe 0.33.3 (registry+https://github.com/rust-lang/crates.io-index)",
+ "eframe",
  "egui",
  "egui-wgpu",
  "image 0.25.9",
