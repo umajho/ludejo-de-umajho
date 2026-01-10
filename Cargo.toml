@@ -1,6 +1,10 @@
 [workspace]
 resolver = "3"
-members = ["ui/deno-wasm-wgpu/crates/*", "ab3de/crates/*"]
+members = [
+  "ui/deno-wasm-wgpu/crates/*",
+  "ab3de/crates/*",
+  "ui/escript/crates/*",
+]
 
 [workspace.package]
 edition = "2024"

@@ -1,0 +1,2 @@
+demo:
+  cargo run -p escript_demo --release
