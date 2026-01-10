@@ -21,6 +21,7 @@ wgpu = "27"
 anyhow = "1.0.100"
 glam = "0.30.9"
 log = "0.4.29"
+wasm-bindgen = "0.2.106"
 
 # dependencies used by `eframe` and `egui_demo_app`
 # =================================================
@@ -74,7 +75,8 @@ rfd = "0.15.4"
 ron = "0.11.0"
 serde = { version = "1.0.228", features = ["derive"] }
 static_assertions = "1.1.0"
-wasm-bindgen = "0.2.100" # Keep wasm-bindgen version in sync in: setup_web.sh, Cargo.toml, Cargo.lock, rust.yml
+# # Keep wasm-bindgen version in sync in: setup_web.sh, Cargo.toml, Cargo.lock, rust.yml
+# wasm-bindgen (already added) (NOTE: egui 0.33.3's `scripts/build_demo_web.sh` uses 0.2.100, which is not the version we use here.)
 wasm-bindgen-futures = "0.4.0"
 web-sys = "0.3.77"
 web-time = "1.1.0"             # Timekeeping for native and web
