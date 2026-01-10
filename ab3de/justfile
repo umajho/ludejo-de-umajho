@@ -1,12 +1,12 @@
 uiless-dev:
   # use `shift-f9` to toggle the hud.
-  MTL_HUD_ENABLED=1 cargo run -- --uiless
+  MTL_HUD_ENABLED=1 cargo run -p ab3de -- --uiless
 
 uiless-run:
-  MTL_HUD_ENABLED=1 cargo run --release -- --uiless
+  MTL_HUD_ENABLED=1 cargo run -p ab3de --release -- --uiless
 
 ui-dev:
-  MTL_HUD_ENABLED=1 cargo run
+  MTL_HUD_ENABLED=1 cargo run -p ab3de
 
 ui-run:
-  MTL_HUD_ENABLED=1 cargo run --release
+  MTL_HUD_ENABLED=1 cargo run -p ab3de --release
