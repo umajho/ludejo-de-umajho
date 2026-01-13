@@ -1,4 +1,6 @@
 mod demo_text_edit;
+mod demo_text_edit_manual;
+mod machine;
 
 use eframe::egui;
 
@@ -16,6 +18,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 #[derive(Default)]
 struct EscriptDemoApp {
     text_edit_demo: demo_text_edit::TextEditDemo,
+    text_edit_demo_manual: demo_text_edit_manual::TextEditDemoManual,
 }
 
 impl EscriptDemoApp {
@@ -47,6 +50,7 @@ impl eframe::App for EscriptDemoApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.heading("Hello World!");
             Self::show_demo_in_window(ctx, &mut self.text_edit_demo);
+            Self::show_demo_in_window(ctx, &mut self.text_edit_demo_manual);
         });
     }
 }

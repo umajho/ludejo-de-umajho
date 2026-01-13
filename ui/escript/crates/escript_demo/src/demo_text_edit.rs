@@ -24,6 +24,8 @@
 //! IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 //! DEALINGS IN THE SOFTWARE.
 
+use egui::Widget;
+
 /// Showcase [`egui::TextEdit`].
 #[derive(PartialEq, Eq)]
 pub struct TextEditDemo {
@@ -51,10 +53,10 @@ impl crate::Demo for TextEditDemo {
         let Self { text } = self;
 
         ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 0.0;
-            ui.label("Advanced usage of ");
-            ui.code("TextEdit");
-            ui.label(".");
+            ui.style_mut().spacing.item_spacing.x = 0.0;
+            egui::Label::new("Advanced usage of ").ui(ui);
+            egui::Label::new(egui::RichText::new("TextEdit").code()).ui(ui);
+            egui::Label::new(".").ui(ui);
         });
 
         let output = egui::TextEdit::multiline(text)
@@ -62,22 +64,23 @@ impl crate::Demo for TextEditDemo {
             .show(ui);
 
         ui.horizontal(|ui| {
-            ui.spacing_mut().item_spacing.x = 0.0;
-            ui.label("Selected text: ");
+            ui.style_mut().spacing.item_spacing.x = 0.0;
+            egui::Label::new("Selected text: ").ui(ui);
             if let Some(text_cursor_range) = output.cursor_range {
                 let selected_text = text_cursor_range.slice_str(text);
-                ui.code(selected_text);
+                egui::Label::new(egui::RichText::new(selected_text).code()).ui(ui);
             }
         });
 
         let anything_selected = output.cursor_range.is_some_and(|cursor| !cursor.is_empty());
 
-        ui.add_enabled(
-            anything_selected,
-            egui::Label::new("Press ctrl+Y to toggle the case of selected text (cmd+Y on Mac)"),
-        );
+        ui.add_enabled_ui(anything_selected, |ui| {
+            egui::Label::new("Press ctrl+Y to toggle the case of selected text (cmd+Y on Mac)")
+                .ui(ui)
+        });
 
-        if ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y))
+        if output.response.has_focus()
+            && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::Y))
             && let Some(text_cursor_range) = output.cursor_range
         {
             use egui::TextBuffer as _;
@@ -94,28 +97,28 @@ impl crate::Demo for TextEditDemo {
         }
 
         ui.horizontal(|ui| {
-            ui.label("Move cursor to the:");
+            egui::Label::new("Move cursor to the:").ui(ui);
 
-            if ui.button("start").clicked() {
+            if egui::Button::new("start").ui(ui).clicked() {
                 let text_edit_id = output.response.id;
                 if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), text_edit_id) {
                     let ccursor = egui::text::CCursor::new(0);
                     state
                         .cursor
                         .set_char_range(Some(egui::text::CCursorRange::one(ccursor)));
-                    state.store(ui.ctx(), text_edit_id);
+                    egui::TextEdit::store_state(ui.ctx(), text_edit_id, state);
                     ui.ctx().memory_mut(|mem| mem.request_focus(text_edit_id)); // give focus back to the [`TextEdit`].
                 }
             }
 
-            if ui.button("end").clicked() {
+            if egui::Button::new("end").ui(ui).clicked() {
                 let text_edit_id = output.response.id;
                 if let Some(mut state) = egui::TextEdit::load_state(ui.ctx(), text_edit_id) {
                     let ccursor = egui::text::CCursor::new(text.chars().count());
                     state
                         .cursor
                         .set_char_range(Some(egui::text::CCursorRange::one(ccursor)));
-                    state.store(ui.ctx(), text_edit_id);
+                    egui::TextEdit::store_state(ui.ctx(), text_edit_id, state);
                     ui.ctx().memory_mut(|mem| mem.request_focus(text_edit_id)); // give focus back to the [`TextEdit`].
                 }
             }
